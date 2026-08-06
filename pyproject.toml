@@ -1,0 +1,39 @@
+[project]
+name = "fiap-tech-challenge-fase-1"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.18.5",
+    "argon2-cffi>=25.1.0",
+    "fastapi-cli>=0.0.29",
+    "fastapi[standard]>=0.139.0",
+    "passlib>=1.7.4",
+    "psycopg[binary]>=3.3.4",
+    "pydantic>=2.13.4",
+    "pydantic-core>=2.46.4",
+    "pyjwt>=2.13.0",
+    "slowapi>=0.1.10",
+    "sqlalchemy>=2.0.51",
+    "uuid6>=2025.0.1",
+    "uvicorn>=0.51.0",
+    "validate-docbr>=2.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "asyncpg>=0.31.0",
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.20",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = "."
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

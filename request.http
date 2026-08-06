@@ -1,0 +1,162 @@
+### Arquivo de Requisições HTTP (REST Client / VS Code)
+### Utilize com a extensão REST Client do VS Code ou JetBrains HTTP Client.
+
+@baseUrl = http://localhost:8000
+
+
+GET {{baseUrl}}/health
+Content-Type: application/json
+
+
+###############################################################################
+# 1. AUTENTICAÇÃO E SESSÃO
+###############################################################################
+
+### 1.1 Login - Gerente
+# @name loginGerente
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "gerente@oficina.com",
+  "senha": "SenhaSegura123!"
+}
+
+### Armazena o Access Token retornado no login
+@authTokenGerente = {{loginGerente.response.body.access_token}}
+
+---
+
+### 1.2 Login - Recepcionista
+# @name loginRecepcionista
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "recepcao@oficina.com",
+  "senha": "SenhaSegura123!"
+}
+
+@authTokenRecepcionista = {{loginRecepcionista.response.body.access_token}}
+
+---
+
+### 1.3 Login - Mecânico
+# @name loginMecanico
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "mecanico@oficina.com",
+  "senha": "SenhaSegura123!"
+}
+
+@authTokenMecanico = {{loginMecanico.response.body.access_token}}
+
+---
+
+### 1.4 Login - Estoquista
+# @name loginEstoquista
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "estoque@oficina.com",
+  "senha": "SenhaSegura123!"
+}
+
+@authTokenEstoquista = {{loginEstoquista.response.body.access_token}}
+
+---
+
+### 1.5 Refresh Token (Renovação da Sessão de 8 horas)
+# O cookie HttpOnly 'refresh_token' enviado pelo login é reutilizado aqui automaticamente pelo REST Client
+POST {{baseUrl}}/auth/refresh
+
+---
+
+### 1.6 Login com Credenciais Inválidas (Teste de Segurança - Erro 401)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "gerente@oficina.com",
+  "senha": "SenhaIncorreta!"
+}
+
+
+###############################################################################
+# 2. GESTÃO DE USUÁRIOS INTERNOS (RBAC - Exclusivo para GERENTE)
+###############################################################################
+
+### 2.1 Cadastrar Novo Operador (Permitido para GERENTE)
+POST {{baseUrl}}/usuarios
+Authorization: Bearer {{authTokenGerente}}
+Content-Type: application/json
+
+{
+  "nome": "Carlos Auxiliar",
+  "email": "carlos.auxiliar@oficina.com",
+  "senha": "SenhaSegura123!",
+  "role": "MECANICO"
+}
+
+---
+
+### 2.2 Tentativa de Cadastrar Operador por Não-Gerente (Teste de RBAC - Erro 403)
+POST {{baseUrl}}/usuarios
+Authorization: Bearer {{authTokenMecanico}}
+Content-Type: application/json
+
+{
+  "nome": "Intruso",
+  "email": "intruso@oficina.com",
+  "senha": "SenhaSegura123!",
+  "role": "GERENTE"
+}
+
+
+###############################################################################
+# 3. CLIENTES E VEÍCULOS (Exemplos para testes das próximas rotas)
+###############################################################################
+
+### 3.1 Cadastrar Cliente (Pessoa Física)
+POST {{baseUrl}}/clientes
+Authorization: Bearer {{authTokenRecepcionista}}
+Content-Type: application/json
+
+{
+  "nome": "João da Silva",
+  "email": "joao.silva@email.com",
+  "telefone": "11999998888",
+  "cpf_cnpj": "12345678901",
+  "tipo_pessoa": "FISICA"
+}
+
+---
+
+### 3.2 Listar Clientes
+GET {{baseUrl}}/clientes
+Authorization: Bearer {{authTokenGerente}}
+
+---
+
+### 3.3 Cadastrar Veículo
+POST {{baseUrl}}/veiculos
+Authorization: Bearer {{authTokenRecepcionista}}
+Content-Type: application/json
+
+{
+  "placa": "ABC1D23",
+  "marca": "Volkswagen",
+  "modelo": "Gol 1.6",
+  "ano": 2021,
+  "cor": "Prata",
+  "cliente_id": "018f3a5b-7c10-7000-8000-000000000001"
+}
+
+---
+
+### 3.4 Buscar Veículo por Placa
+GET {{baseUrl}}/veiculos/ABC1D23
+Authorization: Bearer {{authTokenMecanico}}
