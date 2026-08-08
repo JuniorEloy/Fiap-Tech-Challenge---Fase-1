@@ -10,7 +10,7 @@ from app.features.clientes.editar_cliente.schemas import (
 )
 from app.features.usuarios.models import (
     Usuario,
-)  
+)
 
 
 class EditarClienteHandler:
