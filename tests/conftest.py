@@ -15,7 +15,7 @@ from app.main import app
 
 from app.shared.infra.db.database import get_db
 
-from app.features.autenticacao.models import Usuario
+from app.features.usuarios.models import Usuario
 
 from app.shared.security.roles import Role
 from app.shared.security.password import gerar_hash_senha
@@ -45,11 +45,11 @@ async def db_engine():
 
 @pytest_asyncio.fixture
 async def db(db_engine):
-    
+
     async with db_engine.connect() as connection:
         # Inicia a transação principal do teste
         transaction = await connection.begin()
-        
+
         # Inicia um SAVEPOINT (transação aninhada)
         nested = await connection.begin_nested()
 
@@ -57,8 +57,8 @@ async def db(db_engine):
             bind=connection,
             expire_on_commit=False,
         )
-        
-        # Ouve o evento de término de transação do SQLAlchemy para recriar o SAVEPOINT 
+
+        # Ouve o evento de término de transação do SQLAlchemy para recriar o SAVEPOINT
         # caso a aplicação faça um `await db.commit()` no meio do teste.
         @event.listens_for(session.sync_session, "after_transaction_end")
         def end_savepoint(session, transaction):
@@ -123,7 +123,7 @@ async def criar_usuario(
         id=uuid7(),
         nome=nome,
         email=email,
-        senha_hash=gerar_hash_senha("SenhaSegura123!"),
+        senha=gerar_hash_senha("SenhaSegura123!"),
         role=role,
         ativo=True,
     )

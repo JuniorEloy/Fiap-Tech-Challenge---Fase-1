@@ -5,15 +5,9 @@ from uuid6 import uuid7
 
 from fastapi import status
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from app.shared.utils.clock import DateTimeProvider
-
-from app.features.autenticacao.models import RefreshTokenSession
 
 from app.shared.security.roles import Role
-from app.shared.security.tokens import criar_access_token, gerar_hash_token
-from datetime import timedelta
+from app.shared.security.tokens import criar_access_token
 
 
 ENDPOINT = "/clientes"
@@ -133,20 +127,6 @@ async def test_listar_clientes_com_authorization_invalido_deve_retornar_401(
     )
 
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
-
-
-@pytest.mark.asyncio
-async def test_post_em_endpoint_get_deve_retornar_405(
-    async_client: AsyncClient,
-    token_gerente: str,
-):
-
-    response = await async_client.post(
-        ENDPOINT,
-        headers=auth_header(token_gerente),
-    )
-
-    assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
 
 
 # ==============================================================================

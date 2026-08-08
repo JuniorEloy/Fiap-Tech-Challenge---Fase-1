@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.infra.db.database import get_db
-from .repository import ClienteRepository
+from ..repository import ClienteRepository
 from .handler import ConsultarClienteHandler
 from .schemas import ClienteResponse
 from app.shared.security.rbac import requer_roles

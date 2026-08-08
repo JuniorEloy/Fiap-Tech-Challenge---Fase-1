@@ -2,7 +2,7 @@ import re
 from uuid import UUID
 from typing import List
 from fastapi import HTTPException, status
-from .repository import ClienteRepository
+from ..repository import ClienteRepository
 from .schemas import ClienteResponse
 from app.shared.domain.value_objects.cpf_cnpj import CpfCnpj
 

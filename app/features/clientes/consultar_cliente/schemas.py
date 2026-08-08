@@ -1,7 +1,6 @@
 from uuid import UUID
-from pydantic import BaseModel, field_validator, ConfigDict, EmailStr
+from pydantic import BaseModel, field_validator, ConfigDict, EmailStr, Field
 from app.shared.domain.value_objects.cpf_cnpj import CpfCnpj
-from app.shared.security.roles import Role
 from app.features.clientes.models import TipoPessoa
 
 
@@ -12,7 +11,6 @@ class ClienteResponse(BaseModel):
     cpf_cnpj: str
     telefone: str
     tipo_pessoa: TipoPessoa
-    role: Role
 
     @field_validator("cpf_cnpj")
     @classmethod

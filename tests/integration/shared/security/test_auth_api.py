@@ -6,7 +6,8 @@ from fastapi import status
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.features.autenticacao.models import Usuario, RefreshTokenSession
+from app.features.autenticacao.models import RefreshTokenSession
+from app.features.usuarios.models import Usuario
 from app.shared.security.roles import Role
 from app.shared.security.password import gerar_hash_senha
 from app.shared.security.tokens import gerar_hash_token
@@ -103,7 +104,7 @@ async def test_refresh_token_expirado_deve_retornar_401(
         id=uuid7(),
         nome="Usuario Expirado",
         email="expirado@oficina.com",
-        senha_hash=gerar_hash_senha("SenhaSegura123!"),
+        senha=gerar_hash_senha("SenhaSegura123!"),
         role=Role.GERENTE,
         ativo=True,
     )
@@ -142,7 +143,7 @@ async def test_refresh_token_usuario_inativo_deve_retornar_401(
         id=uuid7(),
         nome="Usuario Inativo",
         email="inativo@oficina.com",
-        senha_hash=gerar_hash_senha("SenhaSegura123!"),
+        senha=gerar_hash_senha("SenhaSegura123!"),
         role=Role.GERENTE,
         ativo=False,
     )
@@ -208,7 +209,7 @@ async def test_reuso_de_token_revogado_fora_da_janela_de_graca_deve_invalidar_se
         id=uuid7(),
         nome="Usuario Ataque",
         email="ataque@oficina.com",
-        senha_hash=gerar_hash_senha("SenhaSegura123!"),
+        senha=gerar_hash_senha("SenhaSegura123!"),
         role=Role.GERENTE,
         ativo=True,
     )
@@ -273,7 +274,7 @@ async def test_reuso_de_token_revogado_dentro_da_janela_nao_revoga_sessoes(
         id=uuid7(),
         nome="Usuario Janela",
         email="janela@oficina.com",
-        senha_hash=gerar_hash_senha("SenhaSegura123!"),
+        senha=gerar_hash_senha("SenhaSegura123!"),
         role=Role.GERENTE,
         ativo=True,
     )

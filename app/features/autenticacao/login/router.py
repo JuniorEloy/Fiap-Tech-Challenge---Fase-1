@@ -10,7 +10,8 @@ from app.shared.infra.db.database import get_db
 from app.shared.security.password import verificar_senha
 from app.shared.security.tokens import criar_access_token, criar_refresh_token_bruto
 from app.shared.security.rate_limiter import limiter, get_login_rate_limit_key
-from app.features.autenticacao.models import Usuario, RefreshTokenSession
+from app.features.autenticacao.models import RefreshTokenSession
+from app.features.usuarios.models import Usuario
 
 from app.shared.utils.clock import DateTimeProvider
 
@@ -43,7 +44,7 @@ async def login(
     # 2. Resposta genérica para evitar User Enumeration (OWASP A07)
     if (
         not usuario
-        or not verificar_senha(body.senha, usuario.senha_hash)
+        or not verificar_senha(body.senha, usuario.senha)
         or not usuario.ativo
     ):
         raise HTTPException(

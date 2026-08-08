@@ -23,7 +23,8 @@ from app.shared.security.tokens import (
     gerar_hash_token,
 )
 from app.shared.security.rate_limiter import limiter, get_user_rate_limit_key
-from app.features.autenticacao.models import Usuario, RefreshTokenSession
+from app.features.autenticacao.models import RefreshTokenSession
+from app.features.usuarios.models import Usuario
 
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])

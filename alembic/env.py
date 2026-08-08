@@ -9,7 +9,8 @@ from app.config import settings
 
 from app.shared.models.base import Base
 from app.features.clientes.models import Cliente
-from app.features.autenticacao.models import Usuario, RefreshTokenSession
+from app.features.usuarios.models import Usuario
+from app.features.autenticacao.models import RefreshTokenSession
 
 DATABASE_URL = (
     f"postgresql+psycopg://"

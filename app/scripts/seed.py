@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.shared.infra.db.database import SessionLocal as AsyncSessionLocal
 from app.shared.security.roles import Role
 from app.shared.security.password import gerar_hash_senha
-from app.features.autenticacao.models import Usuario
+from app.features.usuarios.models import Usuario
 from app.features.clientes.models import Cliente, TipoPessoa
 
 
@@ -49,7 +49,7 @@ async def popular_banco():
                 usuario = Usuario(
                     nome=op["nome"],
                     email=op["email"],
-                    senha_hash=gerar_hash_senha(op["senha"]),
+                    senha=gerar_hash_senha(op["senha"]),
                     role=op["role"],
                 )
                 db.add(usuario)
@@ -94,7 +94,7 @@ async def popular_banco():
                 usuario_cliente = Usuario(
                     nome=c["nome"],
                     email=c["email"],
-                    senha_hash=gerar_hash_senha(c["senha"]),
+                    senha=gerar_hash_senha(c["senha"]),
                     role=Role.CLIENTE,
                 )
                 db.add(usuario_cliente)

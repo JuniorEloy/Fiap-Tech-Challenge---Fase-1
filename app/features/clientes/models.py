@@ -1,11 +1,11 @@
 from enum import Enum
 from uuid import UUID
 from uuid6 import uuid7
-from sqlalchemy import String, Uuid, Enum as SQLEnum, ForeignKey
+from sqlalchemy import String, Uuid, DateTime, Enum as SQLEnum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.shared.models.base import Base
-from app.shared.security.roles import Role
-
+from app.shared.utils.clock import DateTimeProvider
+from datetime import datetime
 
 class TipoPessoa(str, Enum):
     FISICA = "FISICA"
@@ -25,9 +25,7 @@ class Cliente(Base):
     tipo_pessoa: Mapped[TipoPessoa] = mapped_column(
         SQLEnum(TipoPessoa, native_enum=False), nullable=False
     )
-    role: Mapped[Role] = mapped_column(
-        SQLEnum(Role, native_enum=False), default=Role.CLIENTE, nullable=False
-    )
     usuario_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=False
     )
+
