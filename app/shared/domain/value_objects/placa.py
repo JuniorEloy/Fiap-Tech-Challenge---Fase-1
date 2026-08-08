@@ -11,23 +11,29 @@ class Placa:
         self._valor = self._higienizar_e_validar(valor)
 
     def _higienizar_e_validar(self, valor: str) -> str:
-        if not valor:
+        if not valor or not str(valor).strip():
             raise ValueError("A placa do veículo não pode ser vazia.")
 
-        # Higieniza removendo hífens, espaços e forçando maiúsculas
-        limpo = re.sub(r"[\s-]", "", valor).upper()
+        # 1. Remove apenas os ESPAÇOS e deixa maiúsculo. MANTÉM o hífen para inspecionar!
+        pre_limpo = re.sub(r"\s", "", str(valor)).upper()
 
-        # Padrão tradicional: ABC1234
-        regex_tradicional = r"^[A-Z]{3}\d{4}$"
-        # Padrão Mercosul: ABC1D23
-        regex_mercosul = r"^[A-Z]{3}\d[A-Z]\d{2}$"
+        # 2. Expressões Regulares mais rigorosas (aceitam o hífen APENAS no lugar certo)
+        # ^[A-Z]{3} = Começa com 3 letras
+        # -?        = Pode ter zero ou um hífen (exatamente nesta posição)
+        # \d{4}$    = Termina com 4 números
+        regex_tradicional = r"^[A-Z]{3}-?\d{4}$"
+        
+        # O mesmo vale para o Mercosul: aceita ABC1D23 ou ABC-1D23
+        regex_mercosul = r"^[A-Z]{3}-?\d[A-Z]\d{2}$"
 
-        if not (re.match(regex_tradicional, limpo) or re.match(regex_mercosul, limpo)):
+        if not (re.match(regex_tradicional, pre_limpo) or re.match(regex_mercosul, pre_limpo)):
             raise ValueError(
                 "Placa inválida. Formato esperado: AAA-9999 ou Mercosul AAA9A99."
             )
 
-        return limpo
+        # 3. Agora que sabemos que a placa é válida e o hífen (se houver) está no lugar certo,
+        # nós podemos removê-lo tranquilamente para armazenar o valor limpo (7 caracteres).
+        return pre_limpo.replace("-", "")
 
     @property
     def valor(self) -> str:
