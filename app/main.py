@@ -3,9 +3,9 @@ from fastapi import FastAPI
 from app.shared.health import router as health_router
 from app.features.autenticacao.router import auth_router
 from app.features.clientes.router import cliente_router
-from app.features.usuarios.cadastrar_usuario.router import router as usuario_router
+from app.features.usuarios.router import usuario_router
 from app.features.veiculos.router import veiculo_router
-from app.features.relatorios.router import cliente_router as relatorio_router
+from app.features.relatorios.router import relatorio_router
 
 app = FastAPI(
     title="Automotive Service Integrated System",

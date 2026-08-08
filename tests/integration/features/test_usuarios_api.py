@@ -1,6 +1,7 @@
 import pytest
 from fastapi import status
 from httpx import AsyncClient
+from uuid import uuid7
 
 # Ajuste a URL caso o seu endpoint seja diferente (ex: "/operadores" ou "/v1/usuarios")
 ENDPOINT_USUARIOS = "/usuarios"
@@ -117,3 +118,112 @@ async def test_cadastrar_operador_com_payload_invalido_deve_retornar_422(
     )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.asyncio
+async def test_gerente_deve_conseguir_editar_operador_com_sucesso(
+    async_client: AsyncClient, token_gerente: str
+):
+    """
+    Cenário: O Gerente tenta editar os dados cadastrais e o papel de um operador.
+    Resultado esperado: 200 OK com os dados do operador atualizados no banco.
+    """
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+
+    # 1. Cadastramos um operador de teste usando a rota POST oficial
+    payload_cadastro = {
+        "nome": "Mecanico Teste",
+        "email": "mecanico.teste@oficina.com",
+        "senha": "SenhaSecreta123",
+        "role": "MECANICO",
+    }
+    res_cad = await async_client.post(
+        "/usuarios", json=payload_cadastro, headers=headers
+    )
+    assert res_cad.status_code == status.HTTP_201_CREATED
+    usuario_id = res_cad.json()["id"]
+
+    # 2. Solicitamos a edição de campos sensíveis (Nome, E-mail, Senha e Status)
+    payload_edicao = {
+        "nome": "Mecanico Teste Alterado",
+        "email": "mecanico.novoemail@oficina.com",
+        "senha": "NovaSenhaSuperSegura789",
+        "ativo": False,
+    }
+
+    response = await async_client.put(
+        f"/usuarios/{usuario_id}", json=payload_edicao, headers=headers
+    )
+
+    # 3. Asserções finais de sucesso
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["nome"] == "Mecanico Teste Alterado"
+    assert body["email"] == "mecanico.novoemail@oficina.com"
+    assert (
+        body["ativo"] is False
+    )  # Conta devidamente desativada temporariamente pelo Gerente
+
+
+@pytest.mark.asyncio
+async def test_gerente_nao_deve_conseguir_editar_com_email_ja_registrado(
+    async_client: AsyncClient, token_gerente: str
+):
+    """
+    Cenário: Gerente tenta editar o e-mail de um operador para um endereço que já pertence a outra conta.
+    Resultado esperado: 400 Bad Request devido à violação da regra de unicidade cadastral de e-mail.
+    """
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+
+    # 1. Criamos o Usuário A
+    payload_usuario_a = {
+        "nome": "Operador Alfa",
+        "email": "alfa@oficina.com",
+        "senha": "SenhaSecreta123",
+        "role": "MECANICO",
+    }
+    await async_client.post("/usuarios", json=payload_usuario_a, headers=headers)
+
+    # 2. Criamos o Usuário B
+    payload_usuario_b = {
+        "nome": "Operador Beta",
+        "email": "beta@oficina.com",
+        "senha": "SenhaSecreta123",
+        "role": "ESTOQUISTA",
+    }
+    res_b = await async_client.post(
+        "/usuarios", json=payload_usuario_b, headers=headers
+    )
+    usuario_b_id = res_b.json()["id"]
+
+    # 3. Tentamos alterar o e-mail do Usuário B para "alfa@oficina.com" (conflito!)
+    payload_edicao = {"email": "alfa@oficina.com"}
+    response = await async_client.put(
+        f"/usuarios/{usuario_b_id}", json=payload_edicao, headers=headers
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert (
+        response.json()["detail"] == "Já existe um usuário cadastrado com este e-mail."
+    )
+
+
+@pytest.mark.asyncio
+async def test_recepcionista_nao_deve_conseguir_editar_operador(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Um operador sem permissões de gerência (ex: Recepcionista) tenta editar os dados de um usuário.
+    Resultado esperado: 403 Forbidden pelo controle de acesso baseado em papéis (RBAC).
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+
+    # Tentativa direta em um UUID qualquer
+    payload_edicao = {"nome": "Tentativa Invasiva"}
+
+    random_id = str(uuid7())
+    response = await async_client.put(
+        f"/usuarios/{random_id}", json=payload_edicao, headers=headers
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN

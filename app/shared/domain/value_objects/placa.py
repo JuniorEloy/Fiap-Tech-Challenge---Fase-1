@@ -22,11 +22,14 @@ class Placa:
         # -?        = Pode ter zero ou um hífen (exatamente nesta posição)
         # \d{4}$    = Termina com 4 números
         regex_tradicional = r"^[A-Z]{3}-?\d{4}$"
-        
+
         # O mesmo vale para o Mercosul: aceita ABC1D23 ou ABC-1D23
         regex_mercosul = r"^[A-Z]{3}-?\d[A-Z]\d{2}$"
 
-        if not (re.match(regex_tradicional, pre_limpo) or re.match(regex_mercosul, pre_limpo)):
+        if not (
+            re.match(regex_tradicional, pre_limpo)
+            or re.match(regex_mercosul, pre_limpo)
+        ):
             raise ValueError(
                 "Placa inválida. Formato esperado: AAA-9999 ou Mercosul AAA9A99."
             )
