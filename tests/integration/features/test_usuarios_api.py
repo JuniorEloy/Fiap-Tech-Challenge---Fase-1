@@ -227,3 +227,69 @@ async def test_recepcionista_nao_deve_conseguir_editar_operador(
     )
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+@pytest.mark.asyncio
+async def test_gerente_deve_conseguir_consultar_operador_com_sucesso(
+    async_client: AsyncClient, token_gerente: str
+):
+    """
+    Cenário: O Gerente tenta consultar os dados detalhados de um operador pelo ID.
+    Resultado esperado: 200 OK com os dados do operador cadastrados.
+    """
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+
+    # 1. Cadastramos um operador de teste usando a rota POST oficial
+    payload_cadastro = {
+        "nome": "Mecanico Teste Consulta",
+        "email": "mecanico.consulta@oficina.com",
+        "senha": "SenhaSecreta123",
+        "role": "MECANICO"
+    }
+    res_cad = await async_client.post("/usuarios", json=payload_cadastro, headers=headers)
+    assert res_cad.status_code == status.HTTP_201_CREATED
+    usuario_id = res_cad.json()["id"]
+
+    # 2. Solicitamos a consulta pelo ID
+    response = await async_client.get(f"/usuarios/{usuario_id}", headers=headers)
+
+    # 3. Asserções finais de sucesso
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["id"] == usuario_id
+    assert body["nome"] == "Mecanico Teste Consulta"
+    assert body["email"] == "mecanico.consulta@oficina.com"
+    assert body["role"] == "MECANICO"
+    assert body["ativo"] is True
+
+
+@pytest.mark.asyncio
+async def test_gerente_consultar_usuario_inexistente_deve_retornar_404(
+    async_client: AsyncClient, token_gerente: str
+):
+    """
+    Cenário: O Gerente tenta consultar um usuário com ID inexistente no banco.
+    Resultado esperado: 404 Not Found.
+    """
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    random_id = str(uuid7())
+
+    response = await async_client.get(f"/usuarios/{random_id}", headers=headers)
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Usuário não encontrado."
+
+
+@pytest.mark.asyncio
+async def test_recepcionista_nao_deve_conseguir_consultar_operador(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Um operador sem permissões de gerência (ex: Recepcionista) tenta consultar dados de um usuário pelo ID.
+    Resultado esperado: 403 Forbidden pelo controle de acesso baseado em papéis (RBAC).
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    random_id = str(uuid7())
+
+    response = await async_client.get(f"/usuarios/{random_id}", headers=headers)
+    
+    assert response.status_code == status.HTTP_403_FORBIDDEN
