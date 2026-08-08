@@ -13,7 +13,7 @@ async def test_gerente_deve_conseguir_acessar_dashboard_com_sucesso(
     """
     headers = {"Authorization": f"Bearer {token_gerente}"}
 
-    response = await async_client.get("/gerente/dashboard-geral", headers=headers)
+    response = await async_client.get("/relatorio/cliente-veiculo", headers=headers)
     assert response.status_code == status.HTTP_200_OK
 
     body = response.json()
@@ -33,5 +33,5 @@ async def test_recepcionista_nao_deve_acessar_dashboard_do_gerente(
     """
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
 
-    response = await async_client.get("/gerente/dashboard-geral", headers=headers)
+    response = await async_client.get("/relatorio/cliente-veiculo", headers=headers)
     assert response.status_code == status.HTTP_403_FORBIDDEN

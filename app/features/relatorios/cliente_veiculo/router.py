@@ -8,11 +8,11 @@ from app.shared.security.roles import Role
 from app.features.relatorios.cliente_veiculo.query_service import DashboardQueryService
 from app.features.relatorios.cliente_veiculo.schemas import DashboardGeralResponse
 
-router = APIRouter(prefix="/gerente", tags=["Relatórios & Métricas"])
+router = APIRouter(prefix="/relatorio", tags=["Relatórios & Métricas"])
 
 
 @router.get(
-    "/dashboard-geral",
+    "/cliente-veiculo",
     response_model=DashboardGeralResponse,
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(requer_roles([Role.GERENTE]))],
