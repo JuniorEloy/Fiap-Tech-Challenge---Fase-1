@@ -5,6 +5,7 @@ from app.features.autenticacao.router import auth_router
 from app.features.clientes.router import cliente_router
 from app.features.usuarios.cadastrar_usuario.router import router as usuario_router
 from app.features.veiculos.router import veiculo_router
+from app.features.relatorios.router import cliente_router as relatorio_router
 
 app = FastAPI(
     title="Automotive Service Integrated System",
@@ -18,3 +19,4 @@ app.include_router(auth_router)
 app.include_router(cliente_router)
 app.include_router(usuario_router)
 app.include_router(veiculo_router)
+app.include_router(relatorio_router)

@@ -119,3 +119,79 @@ async def test_cadastrar_veiculo_placa_invalida_deve_retornar_422(
         "/veiculos", json=payload_veiculo, headers=headers
     )
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.asyncio
+async def test_consultar_veiculo_por_placa_com_sucesso(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Recepcionista busca um veículo existente pela placa.
+    Resultado esperado: 200 OK com as propriedades do carro formatadas.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+
+    # 1. Cria o cliente primeiro para podermos associar ao carro
+    payload_cliente = {
+        "nome": "Amanda Teste Busca",
+        "email": "amanda.busca@oficina.com",
+        "telefone": "11966665555",
+        "cpf_cnpj": "28604316086",  # CPF Válido
+        "tipo_pessoa": "FISICA",
+    }
+    res_cliente = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
+    assert res_cliente.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cliente.json()["id"]
+
+    # 2. Cadastra o veículo correspondente
+    payload_veiculo = {
+        "placa": "kpg2j45",  # Placa mercosul
+        "marca": "Toyota",
+        "modelo": "Corolla",
+        "ano": 2021,
+        "cliente_id": cliente_id,
+    }
+    res_veiculo = await async_client.post(
+        "/veiculos", json=payload_veiculo, headers=headers
+    )
+    assert res_veiculo.status_code == status.HTTP_201_CREATED
+
+    # 3. Executa a busca direta pela rota GET /veiculos/placa/{placa}
+    # Testando com letras maiúsculas/minúsculas e hífens para provar o poder de higienização do VO
+    response = await async_client.get("/veiculos/placa/KPG-2J45", headers=headers)
+
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["marca"] == "Toyota"
+    assert body["modelo"] == "Corolla"
+    assert body["placa"] == "KPG2J45"  # Saída do VO Mercosul sem hífen
+    assert body["cliente_id"] == cliente_id
+
+
+@pytest.mark.asyncio
+async def test_consultar_veiculo_inexistente_deve_retornar_404(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Busca por placa de veículo que não está cadastrado na base.
+    Resultado esperado: 404 Not Found [4, 5].
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    response = await async_client.get("/veiculos/placa/ZZZ9Z99", headers=headers)
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Veículo não encontrado."
+
+
+@pytest.mark.asyncio
+async def test_consultar_veiculo_com_placa_invalida_deve_retornar_422(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Busca por placa fora dos padrões aceitos AAA-9999 ou Mercosul.
+    Resultado esperado: 422 Unprocessable Entity (Value Object impede a execução) [4, 5].
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    response = await async_client.get("/veiculos/placa/placa-com-erro", headers=headers)
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
