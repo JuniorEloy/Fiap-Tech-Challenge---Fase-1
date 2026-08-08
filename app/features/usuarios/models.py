@@ -21,11 +21,12 @@ from app.shared.utils.clock import DateTimeProvider
 if TYPE_CHECKING:
     from app.features.autenticacao.models import RefreshTokenSession
 
+
 class Usuario(Base):
     __tablename__ = "usuarios"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid7)
-    nome: Mapped[str] = mapped_column(String(150), nullable=False) # Tamanho 150
+    nome: Mapped[str] = mapped_column(String(150), nullable=False)  # Tamanho 150
     email: Mapped[str] = mapped_column(
         String(200), unique=True, nullable=False, index=True
     )

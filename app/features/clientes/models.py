@@ -7,6 +7,7 @@ from app.shared.models.base import Base
 from app.shared.utils.clock import DateTimeProvider
 from datetime import datetime
 
+
 class TipoPessoa(str, Enum):
     FISICA = "FISICA"
     JURIDICA = "JURIDICA"
@@ -28,4 +29,3 @@ class Cliente(Base):
     usuario_id: Mapped[UUID | None] = mapped_column(
         Uuid, ForeignKey("usuarios.id", ondelete="SET NULL"), nullable=False
     )
-

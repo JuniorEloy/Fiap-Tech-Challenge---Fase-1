@@ -20,8 +20,8 @@ router = APIRouter(prefix="/usuarios", tags=["Gestão de Usuários"])
     response_model=UsuarioResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[
-        Depends(requer_roles([Role.GERENTE]))
-    ],  # 👈 Protegida exclusivamente para Gerentes!
+        Depends(requer_roles([Role.GERENTE]))  # Protegida exclusivamente para Gerentes!
+    ],
 )
 async def cadastrar_operador(
     body: CriarUsuarioRequest, db: AsyncSession = Depends(get_db)
