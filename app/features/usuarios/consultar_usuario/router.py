@@ -16,12 +16,9 @@ router = APIRouter(prefix="/usuarios", tags=["Gestão de Usuários"])
     "/{id}",
     response_model=ConsultarUsuarioResponse,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(requer_roles([Role.GERENTE]))]  
+    dependencies=[Depends(requer_roles([Role.GERENTE]))],
 )
-async def consultar_operador(
-    id: UUID,
-    db: AsyncSession = Depends(get_db)
-):
+async def consultar_operador(id: UUID, db: AsyncSession = Depends(get_db)):
     """
     Retorna os dados cadastrais detalhados de um operador administrativo da oficina.
     Acesso restrito exclusivamente para o GERENTE.

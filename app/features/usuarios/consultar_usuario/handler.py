@@ -23,8 +23,7 @@ class ConsultarUsuarioHandler:
 
         if not usuario:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Usuário não encontrado."
+                status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado."
             )
 
         return ConsultarUsuarioResponse.model_validate(usuario)

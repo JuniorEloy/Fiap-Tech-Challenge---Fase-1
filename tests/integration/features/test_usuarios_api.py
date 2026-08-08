@@ -228,6 +228,7 @@ async def test_recepcionista_nao_deve_conseguir_editar_operador(
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
+
 @pytest.mark.asyncio
 async def test_gerente_deve_conseguir_consultar_operador_com_sucesso(
     async_client: AsyncClient, token_gerente: str
@@ -243,9 +244,11 @@ async def test_gerente_deve_conseguir_consultar_operador_com_sucesso(
         "nome": "Mecanico Teste Consulta",
         "email": "mecanico.consulta@oficina.com",
         "senha": "SenhaSecreta123",
-        "role": "MECANICO"
+        "role": "MECANICO",
     }
-    res_cad = await async_client.post("/usuarios", json=payload_cadastro, headers=headers)
+    res_cad = await async_client.post(
+        "/usuarios", json=payload_cadastro, headers=headers
+    )
     assert res_cad.status_code == status.HTTP_201_CREATED
     usuario_id = res_cad.json()["id"]
 
@@ -274,7 +277,7 @@ async def test_gerente_consultar_usuario_inexistente_deve_retornar_404(
     random_id = str(uuid7())
 
     response = await async_client.get(f"/usuarios/{random_id}", headers=headers)
-    
+
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.json()["detail"] == "Usuário não encontrado."
 
@@ -291,5 +294,5 @@ async def test_recepcionista_nao_deve_conseguir_consultar_operador(
     random_id = str(uuid7())
 
     response = await async_client.get(f"/usuarios/{random_id}", headers=headers)
-    
+
     assert response.status_code == status.HTTP_403_FORBIDDEN
