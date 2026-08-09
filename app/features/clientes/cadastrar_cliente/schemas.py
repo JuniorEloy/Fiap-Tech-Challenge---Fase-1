@@ -1,5 +1,5 @@
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 from app.features.clientes.models import TipoPessoa
 from app.shared.domain.value_objects.cpf_cnpj import CpfCnpj
 from app.shared.domain.value_objects.email import Email
@@ -56,9 +56,8 @@ class ClienteResponse(BaseModel):
     cpf_cnpj: str
     tipo_pessoa: TipoPessoa
 
-    class Config:
-        from_attributes = True
-
+    model_config = ConfigDict(from_attributes=True)
+    
     # Customização para que a resposta exiba o CPF/CNPJ formatado de forma legível
     @field_validator("cpf_cnpj", mode="before")
     @classmethod

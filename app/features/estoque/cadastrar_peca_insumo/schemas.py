@@ -1,7 +1,7 @@
 from typing import Optional
 from uuid import UUID
 from decimal import Decimal
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class CadastrarPecaRequest(BaseModel):
@@ -50,5 +50,4 @@ class PecaResponse(BaseModel):
     limite_minimo: int
     precisa_recompra: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

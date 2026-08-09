@@ -1,5 +1,5 @@
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from app.shared.security.roles import Role
 from app.shared.domain.value_objects.email import Email
 
@@ -19,5 +19,4 @@ class ConsultarUsuarioResponse(BaseModel):
         # Usa o VO para validar a entrada e já higieniza (retorna limpo)
         return Email(v).valor
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

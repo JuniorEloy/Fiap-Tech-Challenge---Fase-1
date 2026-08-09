@@ -1,5 +1,5 @@
 from uuid import UUID
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from app.shared.domain.value_objects.placa import Placa
 
 
@@ -11,8 +11,7 @@ class ConsultarVeiculoResponse(BaseModel):
     ano: int
     cliente_id: UUID
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
     # Reconstrói a Placa formatando a saída de acordo com o padrão do VO
     @field_validator("placa", mode="before")
