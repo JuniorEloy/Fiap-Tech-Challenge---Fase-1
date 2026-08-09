@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.rate_limiter import limiter, get_login_rate_limit_key
-from app.config import settings  
+from app.config import settings
 
 from app.features.autenticacao.login.schemas import LoginRequest, TokenResponse
 from app.features.autenticacao.login.handler import LoginHandler
@@ -45,5 +45,5 @@ async def login(
     return TokenResponse(
         access_token=access_token,
         token_type="bearer",
-        expires_in_seconds=expires_in_seconds  
+        expires_in_seconds=expires_in_seconds,
     )

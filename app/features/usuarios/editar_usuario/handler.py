@@ -4,16 +4,21 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.features.usuarios.models import Usuario
-from app.features.usuarios.editar_usuario.schemas import EditarUsuarioRequest, UsuarioEditadoResponse
+from app.features.usuarios.editar_usuario.schemas import (
+    EditarUsuarioRequest,
+    UsuarioEditadoResponse,
+)
 from app.shared.security.password import gerar_hash_senha
-from app.shared.domain.value_objects.email import Email 
+from app.shared.domain.value_objects.email import Email
 
 
 class EditarUsuarioHandler:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def executar(self, usuario_id: UUID, command: EditarUsuarioRequest) -> UsuarioEditadoResponse:
+    async def executar(
+        self, usuario_id: UUID, command: EditarUsuarioRequest
+    ) -> UsuarioEditadoResponse:
         """
         Executa as validações e persiste as modificações no operador:
         1. Busca o usuário pelo ID.
@@ -24,11 +29,10 @@ class EditarUsuarioHandler:
         # 1. Recupera o operador cadastrado
         result = await self.db.execute(select(Usuario).where(Usuario.id == usuario_id))
         usuario = result.scalar_one_or_none()
-        
+
         if not usuario:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Usuário não encontrado."
+                status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado."
             )
 
         # 2. Se o e-mail foi enviado no payload, valida e normaliza usando o Value Object
@@ -40,20 +44,19 @@ class EditarUsuarioHandler:
             except ValueError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"E-mail inválido: {str(exc)}"
+                    detail=f"E-mail inválido: {str(exc)}",
                 )
 
         # Garante unicidade absoluta na base usando o e-mail higienizado
         if email_limpo is not None and email_limpo != usuario.email:
             email_conflict_query = select(Usuario).where(
-                Usuario.email == email_limpo, 
-                Usuario.id != usuario_id
+                Usuario.email == email_limpo, Usuario.id != usuario_id
             )
             conflict_res = await self.db.execute(email_conflict_query)
             if conflict_res.scalars().first():
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Já existe um usuário cadastrado com este e-mail."
+                    detail="Já existe um usuário cadastrado com este e-mail.",
                 )
 
         # 3. Atualização condicional e segura de campos
@@ -61,7 +64,7 @@ class EditarUsuarioHandler:
             usuario.nome = command.nome
 
         if email_limpo is not None:
-            usuario.email = email_limpo 
+            usuario.email = email_limpo
 
         if command.senha is not None:
             usuario.senha_hash = gerar_hash_senha(command.senha)

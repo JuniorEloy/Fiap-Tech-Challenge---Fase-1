@@ -5,6 +5,7 @@ from app.features.clientes.models import TipoPessoa
 from app.shared.domain.value_objects.email import Email
 from app.shared.domain.value_objects.telefone import Telefone
 
+
 class ClienteResponse(BaseModel):
     id: UUID
     nome: str

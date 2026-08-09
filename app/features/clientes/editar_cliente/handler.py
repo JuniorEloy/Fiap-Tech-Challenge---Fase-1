@@ -13,6 +13,7 @@ from app.features.usuarios.models import (
 )
 from app.shared.domain.value_objects.email import Email
 
+
 class EditarClienteHandler:
     def __init__(self, repository: ClienteRepository):
         self.repository = repository
@@ -43,7 +44,7 @@ class EditarClienteHandler:
             except ValueError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"E-mail inválido: {str(exc)}"
+                    detail=f"E-mail inválido: {str(exc)}",
                 )
 
         # 2. Valida e-mail duplicado em Clientes e Usuários (usando o valor higienizado!)
@@ -92,7 +93,7 @@ class EditarClienteHandler:
             if usuario:
                 usuario.nome = command.nome
 
-        if email_limpo is not None: 
+        if email_limpo is not None:
             cliente.email = email_limpo
             if usuario:
                 usuario.email = email_limpo

@@ -11,8 +11,8 @@ from app.features.relatorios.cliente_veiculo.schemas import (
 )
 from app.shared.domain.value_objects.cpf_cnpj import CpfCnpj
 from app.shared.domain.value_objects.placa import Placa
-from app.shared.domain.value_objects.email import Email 
-from app.shared.domain.value_objects.telefone import Telefone 
+from app.shared.domain.value_objects.email import Email
+from app.shared.domain.value_objects.telefone import Telefone
 
 
 class RelatorioClienteVeiculoQueryService:
@@ -38,12 +38,18 @@ class RelatorioClienteVeiculoQueryService:
                 Cliente.id,
                 Cliente.nome,
                 Cliente.email,
-                Cliente.telefone,  
+                Cliente.telefone,
                 Cliente.cpf_cnpj,
                 func.count(Veiculo.id).label("total_veiculos"),
             )
             .outerjoin(Veiculo, Veiculo.cliente_id == Cliente.id)
-            .group_by(Cliente.id, Cliente.nome, Cliente.email, Cliente.telefone, Cliente.cpf_cnpj)
+            .group_by(
+                Cliente.id,
+                Cliente.nome,
+                Cliente.email,
+                Cliente.telefone,
+                Cliente.cpf_cnpj,
+            )
         )
         res_clientes = await self.db.execute(query_clientes)
         clientes_list = []

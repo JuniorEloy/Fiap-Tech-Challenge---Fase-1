@@ -1,10 +1,12 @@
 import re
 
+
 class Email:
     """
     Value Object representando um endereço de e-mail válido.
     Garante immutabilidade, higienização de espaços e caixa baixa.
     """
+
     def __init__(self, valor: str):
         self._valor = self._validar_e_higienizar(valor)
 
@@ -16,7 +18,7 @@ class Email:
         limpo = valor.strip().lower()
 
         # Regex padrão RFC 5322 simplificada de alta cobertura
-        regex_email = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        regex_email = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(regex_email, limpo):
             raise ValueError("Endereço de e-mail inválido.")
 

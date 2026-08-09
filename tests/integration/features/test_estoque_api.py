@@ -2,6 +2,12 @@
 import pytest
 from fastapi import status
 from httpx import AsyncClient
+import asyncio
+from uuid import uuid7
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.main import app
+from app.shared.infra.db.database import get_db
+from app.shared.infra.db.database import SessionLocal
 
 
 @pytest.mark.asyncio
@@ -73,4 +79,137 @@ async def test_mecanico_nao_deve_ter_permissao_de_cadastrar_peca(
     }
 
     response = await async_client.post("/estoque", json=payload, headers=headers)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_baixar_estoque_com_sucesso(
+    async_client: AsyncClient, token_mecanico: str, token_estoquista: str
+):
+    """
+    Cenário: Mecânico solicita a baixa de estoque de uma peça existente.
+    Resultado esperado: 200 OK com saldo deduzido e indicador precisa_recompra=False (se saldo >= 15).
+    """
+    headers_estoquista = {"Authorization": f"Bearer {token_estoquista}"}
+    headers_mecanico = {"Authorization": f"Bearer {token_mecanico}"}
+
+    # 1. Cadastra uma peça pelo Estoquista com 50 unidades de saldo inicial
+    payload_cadastro = {
+        "nome": "Pastilha de Freio Bosch Flex",
+        "descricao": "Pastilha dianteira de alta performance",
+        "quantidade_inicial": 50,
+        "preco_venda": 180.00,
+        "preco_custo": 90.00,
+        "limite_minimo": 15,
+    }
+    res_cadastro = await async_client.post(
+        "/estoque", json=payload_cadastro, headers=headers_estoquista
+    )
+    assert res_cadastro.status_code == status.HTTP_201_CREATED
+    peca_id = res_cadastro.json()["id"]
+
+    # 2. Mecânico realiza a baixa de 10 unidades
+    payload_baixa = {"peca_id": peca_id, "quantidade": 10}
+    response = await async_client.post(
+        "/estoque/baixas", json=payload_baixa, headers=headers_mecanico
+    )
+
+    # 3. Validações finais
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["peca_id"] == peca_id
+    assert body["quantidade_retirada"] == 10
+    assert body["saldo_restante"] == 40  # 50 - 10
+    assert body["precisa_recompra"] is False
+
+
+@pytest.mark.asyncio
+async def test_baixar_estoque_insuficiente_deve_retornar_400(
+    async_client: AsyncClient, token_mecanico: str, token_estoquista: str
+):
+    """
+    Cenário: Mecânico tenta baixar uma quantidade superior ao saldo atual disponível.
+    Resultado esperado: 400 Bad Request com mensagem descritiva de estoque insuficiente.
+    """
+    headers_estoquista = {"Authorization": f"Bearer {token_estoquista}"}
+    headers_mecanico = {"Authorization": f"Bearer {token_mecanico}"}
+
+    # 1. Cadastra peça com estoque pequeno (ex: 5 unidades)
+    payload_cadastro = {
+        "nome": "Filtro de Ar Esportivo K&N",
+        "descricao": "Filtro inbox lavável",
+        "quantidade_inicial": 5,
+        "preco_venda": 450.00,
+        "preco_custo": 250.00,
+        "limite_minimo": 15,
+    }
+    res_cadastro = await async_client.post(
+        "/estoque", json=payload_cadastro, headers=headers_estoquista
+    )
+    peca_id = res_cadastro.json()["id"]
+
+    # 2. Tenta baixar 8 unidades (excedendo as 5 disponíveis)
+    payload_baixa = {"peca_id": peca_id, "quantidade": 8}
+    response = await async_client.post(
+        "/estoque/baixas", json=payload_baixa, headers=headers_mecanico
+    )
+
+    # 3. Validações de erro
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Estoque insuficiente" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_baixar_estoque_gatilho_politica_compra_menor_que_15(
+    async_client: AsyncClient, token_mecanico: str, token_estoquista: str
+):
+    """
+    Cenário: Baixa de estoque deixa o saldo remanescente abaixo do limite de segurança (15 itens).
+    Resultado esperado: Disparo lógico da política indicando precisa_recompra=True.
+    """
+    headers_estoquista = {"Authorization": f"Bearer {token_estoquista}"}
+    headers_mecanico = {"Authorization": f"Bearer {token_mecanico}"}
+
+    # 1. Cadastra peça com estoque inicial de 20 unidades
+    payload_cadastro = {
+        "nome": "Óleo de Câmbio Motul ATF VI",
+        "descricao": "Lubrificante 100% sintético para transmissão automática",
+        "quantidade_inicial": 20,
+        "preco_venda": 95.00,
+        "preco_custo": 50.00,
+        "limite_minimo": 15,
+    }
+    res_cadastro = await async_client.post(
+        "/estoque", json=payload_cadastro, headers=headers_estoquista
+    )
+    peca_id = res_cadastro.json()["id"]
+
+    # 2. Mecânico baixa 8 unidades (saldo cai para 12, que é menor que 15)
+    payload_baixa = {"peca_id": peca_id, "quantidade": 8}
+    response = await async_client.post(
+        "/estoque/baixas", json=payload_baixa, headers=headers_mecanico
+    )
+
+    # 3. Valida se a política de disparo de compra foi ativada
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["saldo_restante"] == 12
+    assert (
+        body["precisa_recompra"] is True
+    )  # 👈 Política de domínio ativada com sucesso!
+
+
+@pytest.mark.asyncio
+async def test_baixar_estoque_rbac_bloqueia_recepcionista(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Um operador sem atribuição mecânica (ex: Recepcionista) tenta dar baixa direta de estoque.
+    Resultado esperado: 403 Forbidden (RBAC operando com sucesso).
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    payload_baixa = {"peca_id": str(uuid7()), "quantidade": 1}
+    response = await async_client.post(
+        "/estoque/baixas", json=payload_baixa, headers=headers
+    )
     assert response.status_code == status.HTTP_403_FORBIDDEN

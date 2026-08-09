@@ -11,6 +11,7 @@ from app.shared.security.password import gerar_hash_senha
 from app.shared.security.roles import Role
 from app.shared.domain.value_objects.email import Email
 
+
 class CadastrarClienteHandler:
     def __init__(self, repository: ClienteRepository):
         self.repository = repository

@@ -5,8 +5,12 @@ from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import requer_roles
 from app.shared.security.roles import Role
 
-from app.features.relatorios.cliente_veiculo.query_service import RelatorioClienteVeiculoQueryService
-from app.features.relatorios.cliente_veiculo.schemas import RelatorioClienteVeiculoResponse
+from app.features.relatorios.cliente_veiculo.query_service import (
+    RelatorioClienteVeiculoQueryService,
+)
+from app.features.relatorios.cliente_veiculo.schemas import (
+    RelatorioClienteVeiculoResponse,
+)
 
 router = APIRouter(prefix="/relatorio", tags=["Relatórios & Métricas"])
 

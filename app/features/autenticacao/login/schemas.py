@@ -4,6 +4,7 @@ from app.shared.domain.value_objects.email import Email
 
 class LoginRequest(BaseModel):
     """Schema de entrada para o fluxo de autenticação."""
+
     email: str = Field(..., description="E-mail de acesso à conta")
     senha: str = Field(..., description="Senha secreta do operador")
 
@@ -18,6 +19,9 @@ class LoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     """Schema de retorno contendo o Access Token e metadados de expiração."""
+
     access_token: str
     token_type: str = "bearer"
-    expires_in_seconds: int = Field(..., description="Tempo de vida do token em segundos")  
+    expires_in_seconds: int = Field(
+        ..., description="Tempo de vida do token em segundos"
+    )

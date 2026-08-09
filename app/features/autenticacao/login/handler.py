@@ -14,13 +14,17 @@ class LoginHandler:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def executar(self, email_higienizado: str, senha_crua: str) -> tuple[Usuario, str, str]:
+    async def executar(
+        self, email_higienizado: str, senha_crua: str
+    ) -> tuple[Usuario, str, str]:
         """
         Executa as validações de credenciais e gera o par de tokens.
         Retorna a tupla (Usuario, AccessToken, RefreshTokenBruto) em caso de sucesso.
         """
         # 1. Busca usuário usando o e-mail que já veio normalizado pelo Schema
-        result = await self.db.execute(select(Usuario).where(Usuario.email == email_higienizado))
+        result = await self.db.execute(
+            select(Usuario).where(Usuario.email == email_higienizado)
+        )
         usuario = result.scalar_one_or_none()
 
         # 2. Prevenção de User Enumeration (OWASP A07): Resposta genérica unificada

@@ -5,6 +5,7 @@ from app.shared.domain.value_objects.cpf_cnpj import CpfCnpj
 from app.shared.domain.value_objects.email import Email
 from app.shared.domain.value_objects.telefone import Telefone
 
+
 class CadastrarClienteRequest(BaseModel):
     """Esquema de entrada para cadastrar cliente."""
 
