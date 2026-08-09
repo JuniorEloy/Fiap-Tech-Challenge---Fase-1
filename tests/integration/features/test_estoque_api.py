@@ -4,10 +4,7 @@ from fastapi import status
 from httpx import AsyncClient
 import asyncio
 from uuid import uuid7
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.main import app
-from app.shared.infra.db.database import get_db
-from app.shared.infra.db.database import SessionLocal
+
 
 
 @pytest.mark.asyncio
@@ -212,4 +209,79 @@ async def test_baixar_estoque_rbac_bloqueia_recepcionista(
     response = await async_client.post(
         "/estoque/baixas", json=payload_baixa, headers=headers
     )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+@pytest.mark.asyncio
+async def test_estoquista_deve_registrar_entrada_com_sucesso(
+    async_client: AsyncClient, token_estoquista: str
+):
+    """
+    Cenário: Estoquista solicita a entrada de estoque para uma peça existente.
+    Resultado esperado: 200 OK com saldo acrescido e precisa_recompra reavaliado.
+    """
+    headers = {"Authorization": f"Bearer {token_estoquista}"}
+
+    # 1. Cadastra uma peça com 5 unidades de saldo inicial (precisa_recompra = True)
+    payload_cadastro = {
+        "nome": "Filtro de Cabine Tecfil",
+        "descricao": "Filtro de ar-condicionado anti-polen",
+        "quantidade_inicial": 5,
+        "preco_venda": 45.00,
+        "preco_custo": 20.00,
+        "limite_minimo": 15
+    }
+    res_cadastro = await async_client.post("/estoque", json=payload_cadastro, headers=headers)
+    assert res_cadastro.status_code == status.HTTP_201_CREATED
+    peca_id = res_cadastro.json()["id"]
+    assert res_cadastro.json()["precisa_recompra"] is True
+
+    # 2. Registra entrada de 20 unidades de saldo
+    payload_entrada = {
+        "peca_id": peca_id,
+        "quantidade": 20
+    }
+    response = await async_client.post("/estoque/entradas", json=payload_entrada, headers=headers)
+
+    # 3. Validações finais de saldo e política de domínio
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["peca_id"] == peca_id
+    assert body["quantidade_adicionada"] == 20
+    assert body["saldo_anterior"] == 5
+    assert body["saldo_atual"] == 25  # 5 + 20
+    # Como o novo saldo (25) é superior ou igual ao limite (15), precisa_recompra deve ser False
+    assert body["precisa_recompra"] is False
+
+
+@pytest.mark.asyncio
+async def test_registrar_entrada_com_quantidade_invalida_deve_retornar_422(
+    async_client: AsyncClient, token_estoquista: str
+):
+    """
+    Cenário: Estoquista tenta registrar entrada com quantidade zero ou negativa.
+    Resultado esperado: 422 Unprocessable Entity devido à validação do Schema Pydantic.
+    """
+    headers = {"Authorization": f"Bearer {token_estoquista}"}
+    payload_entrada = {
+        "peca_id": str(uuid7()),
+        "quantidade": 0  # Quantidade inválida!
+    }
+    response = await async_client.post("/estoque/entradas", json=payload_entrada, headers=headers)
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.asyncio
+async def test_mecanico_nao_deve_conseguir_registrar_entrada_estoque(
+    async_client: AsyncClient, token_mecanico: str
+):
+    """
+    Cenário: Um mecânico tenta registrar entrada no estoque da oficina.
+    Resultado esperado: 403 Forbidden pelo controle de segurança por papéis (RBAC).
+    """
+    headers = {"Authorization": f"Bearer {token_mecanico}"}
+    payload_entrada = {
+        "peca_id": str(uuid7()),
+        "quantidade": 10
+    }
+    response = await async_client.post("/estoque/entradas", json=payload_entrada, headers=headers)
     assert response.status_code == status.HTTP_403_FORBIDDEN
