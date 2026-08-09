@@ -10,7 +10,7 @@ from app.shared.security.roles import Role
 
 def requer_roles(roles_permitidas: Sequence[Role]):
 
-    async def verificar(
+    def verificar(
         usuario: UsuarioToken = Depends(obter_usuario_atual),
     ) -> UsuarioToken:
 

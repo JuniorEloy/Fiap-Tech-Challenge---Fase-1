@@ -12,7 +12,7 @@ from app.shared.security.tokens import decodificar_token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
-async def obter_usuario_atual(
+def obter_usuario_atual(
     token: str = Depends(oauth2_scheme),
 ) -> UsuarioToken:
     """
@@ -52,7 +52,7 @@ async def obter_usuario_atual(
 def requer_roles(roles_permitidas: Sequence[Role]):
     """Valida se a role do usuário no JWT tem permissão para acessar o endpoint."""
 
-    async def verificador(
+    def verificador(
         usuario_atual: UsuarioToken = Depends(obter_usuario_atual),
     ) -> UsuarioToken:
         if usuario_atual.role not in roles_permitidas:
