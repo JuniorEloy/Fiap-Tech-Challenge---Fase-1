@@ -1,6 +1,6 @@
 from uuid import UUID
 from typing import List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ClienteRelatorioDTO(BaseModel):
@@ -17,8 +17,7 @@ class ClienteRelatorioDTO(BaseModel):
     )
     total_veiculos: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class VeiculoRelatorioDTO(BaseModel):
@@ -32,8 +31,7 @@ class VeiculoRelatorioDTO(BaseModel):
     modelo: str
     nome_proprietario: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RelatorioClienteVeiculoResponse(BaseModel):
@@ -44,5 +42,4 @@ class RelatorioClienteVeiculoResponse(BaseModel):
     clientes: List[ClienteRelatorioDTO]
     veiculos: List[VeiculoRelatorioDTO]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

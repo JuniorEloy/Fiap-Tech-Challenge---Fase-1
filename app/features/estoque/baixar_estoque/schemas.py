@@ -1,5 +1,5 @@
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class BaixarEstoqueRequest(BaseModel):
@@ -24,5 +24,4 @@ class BaixaEstoqueResponse(BaseModel):
         description="True se o saldo restante ficou abaixo do limite mínimo de segurança (15 itens)",
     )
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
