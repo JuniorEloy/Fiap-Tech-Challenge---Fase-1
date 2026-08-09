@@ -11,7 +11,7 @@ from app.features.clientes.editar_cliente.schemas import (
 from app.features.usuarios.models import (
     Usuario,
 )
-
+from app.shared.domain.value_objects.email import Email
 
 class EditarClienteHandler:
     def __init__(self, repository: ClienteRepository):
@@ -35,10 +35,22 @@ class EditarClienteHandler:
                 status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado."
             )
 
-        # 2. Valida e-mail duplicado em Clientes e Usuários
-        if command.email and command.email != cliente.email:
+        # 1. Higieniza e valida o e-mail utilizando o Value Object (se fornecido no payload)
+        email_limpo = None
+        if command.email is not None:
+            try:
+                email_limpo = Email(command.email).valor
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"E-mail inválido: {str(exc)}"
+                )
+
+        # 2. Valida e-mail duplicado em Clientes e Usuários (usando o valor higienizado!)
+        if email_limpo is not None and email_limpo != cliente.email:
+            # Busca conflito em Clientes
             query_cli_email = select(Cliente).where(
-                Cliente.email == command.email, Cliente.id != cliente_id
+                Cliente.email == email_limpo, Cliente.id != cliente_id
             )
             res_cli_email = await self.repository.db.execute(query_cli_email)
             if res_cli_email.scalars().first():
@@ -47,8 +59,9 @@ class EditarClienteHandler:
                     detail="O e-mail informado já está em uso por outro cliente.",
                 )
 
+            # Busca conflito em Usuários de autenticação
             query_usr_email = select(Usuario).where(
-                Usuario.email == command.email, Usuario.id != cliente.usuario_id
+                Usuario.email == email_limpo, Usuario.id != cliente.usuario_id
             )
             res_usr_email = await self.repository.db.execute(query_usr_email)
             if res_usr_email.scalars().first():
@@ -79,10 +92,10 @@ class EditarClienteHandler:
             if usuario:
                 usuario.nome = command.nome
 
-        if command.email is not None:
-            cliente.email = command.email
+        if email_limpo is not None: 
+            cliente.email = email_limpo
             if usuario:
-                usuario.email = command.email
+                usuario.email = email_limpo
 
         if command.telefone is not None:
             cliente.telefone = command.telefone

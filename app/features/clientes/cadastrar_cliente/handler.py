@@ -9,7 +9,7 @@ from app.features.clientes.cadastrar_cliente.schemas import (
 from app.features.usuarios.models import Usuario
 from app.shared.security.password import gerar_hash_senha
 from app.shared.security.roles import Role
-
+from app.shared.domain.value_objects.email import Email
 
 class CadastrarClienteHandler:
     def __init__(self, repository: ClienteRepository):
@@ -26,9 +26,11 @@ class CadastrarClienteHandler:
         # 2. Criamos automaticamente a credencial (Usuario) para o Cliente
         senha_padrao_hash = gerar_hash_senha(command.cpf_cnpj)
 
+        email_limpo = Email(command.email).valor
+
         novo_usuario = Usuario(
             nome=command.nome,
-            email=command.email,
+            email=email_limpo,
             senha=senha_padrao_hash,
             role=Role.CLIENTE,
         )
@@ -43,7 +45,7 @@ class CadastrarClienteHandler:
         novo_cliente = Cliente(
             id=uuid7(),
             nome=command.nome,
-            email=command.email,
+            email=email_limpo,
             telefone=command.telefone,
             cpf_cnpj=command.cpf_cnpj,
             tipo_pessoa=command.tipo_pessoa,

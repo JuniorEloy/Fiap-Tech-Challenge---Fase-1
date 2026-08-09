@@ -2,7 +2,8 @@ from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.features.clientes.models import TipoPessoa
 from app.shared.domain.value_objects.cpf_cnpj import CpfCnpj
-
+from app.shared.domain.value_objects.email import Email
+from app.shared.domain.value_objects.telefone import Telefone
 
 class CadastrarClienteRequest(BaseModel):
     """Esquema de entrada para cadastrar cliente."""
@@ -31,6 +32,18 @@ class CadastrarClienteRequest(BaseModel):
         except ValueError as exc:
             raise ValueError(str(exc))
 
+    @field_validator("email")
+    @classmethod
+    def validar_email(cls, v: str) -> str:
+        # Usa o VO para validar a entrada e já higieniza (retorna limpo)
+        return Email(v).valor
+
+    @field_validator("telefone")
+    @classmethod
+    def validar_telefone(cls, v: str) -> str:
+        # Usa o VO para validar e salvar apenas os dígitos limpos no banco
+        return Telefone(v).valor
+
 
 class ClienteResponse(BaseModel):
     """Esquema de saída do cliente cadastrado."""
@@ -50,3 +63,9 @@ class ClienteResponse(BaseModel):
     @classmethod
     def formatar_documento(cls, valor: str) -> str:
         return CpfCnpj(valor).formatado
+
+    @field_validator("telefone", mode="before")
+    @classmethod
+    def formatar_telefone(cls, v: str) -> str:
+        # Retorna formatado no padrão (XX) XXXXX-XXXX
+        return Telefone(v).formatado

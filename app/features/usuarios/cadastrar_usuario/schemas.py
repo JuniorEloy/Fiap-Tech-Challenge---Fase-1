@@ -1,6 +1,7 @@
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.shared.security.roles import Role
+from app.shared.domain.value_objects.email import Email
 
 
 class CriarUsuarioRequest(BaseModel):
@@ -11,6 +12,12 @@ class CriarUsuarioRequest(BaseModel):
     senha: str = Field(..., min_length=6, description="Senha segura de acesso")
     role: Role = Field(..., description="Papel administrativo")
 
+    @field_validator("email")
+    @classmethod
+    def validar_email(cls, v: str) -> str:
+        # Usa o VO para validar a entrada e já higieniza (retorna limpo)
+        return Email(v).valor
+
 
 class UsuarioResponse(BaseModel):
     """Schema de Saída: Dados expostos após a criação."""
@@ -19,6 +26,12 @@ class UsuarioResponse(BaseModel):
     nome: str
     email: EmailStr
     role: Role
+
+    @field_validator("email")
+    @classmethod
+    def validar_email(cls, v: str) -> str:
+        # Usa o VO para validar a entrada e já higieniza (retorna limpo)
+        return Email(v).valor
 
     class Config:
         from_attributes = True  # Permite mapear diretamente do model Usuario
