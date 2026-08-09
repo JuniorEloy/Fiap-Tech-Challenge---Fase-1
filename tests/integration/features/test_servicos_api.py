@@ -208,3 +208,112 @@ async def test_estoquista_nao_deve_conseguir_consultar_servico_por_id(
 
     response = await async_client.get(f"/servicos/{random_uuid}", headers=headers)
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_gerente_deve_conseguir_editar_servico_com_sucesso(
+    async_client: AsyncClient, token_gerente: str
+):
+    """
+    Cenário: Gerente altera a precificação e a descrição de um serviço existente.
+    Resultado esperado: 200 OK com os dados devidamente atualizados e salvos no banco.
+    """
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+
+    # 1. Cadastra serviço inicial
+    payload_cad = {
+        "nome": "Descarbonização de Válvulas",
+        "descricao": "Limpeza química profunda do coletor de admissão e cabeçote",
+        "preco_mao_de_obra": 450.00,
+        "duracao_estimada_minutos": 180,
+    }
+    res_cad = await async_client.post("/servicos", json=payload_cad, headers=headers)
+    assert res_cad.status_code == status.HTTP_201_CREATED
+    servico_id = res_cad.json()["id"]
+
+    # 2. Solicita a alteração cadastral parcial
+    payload_edit = {
+        "descricao": "Descarbonização química e física por hidrogênio de válvulas de admissão",
+        "preco_mao_de_obra": 499.90,
+        "ativo": False,
+    }
+    response = await async_client.put(
+        f"/servicos/{servico_id}", json=payload_edit, headers=headers
+    )
+
+    # 3. Asserções finais
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["id"] == servico_id
+    assert body["nome"] == "Descarbonização de Válvulas"  # Mantido inalterado
+    assert (
+        body["descricao"]
+        == "Descarbonização química e física por hidrogênio de válvulas de admissão"
+    )  # Atualizado
+    assert body["preco_mao_de_obra"] == "499.90"  # Atualizado
+    assert body["duracao_estimada_minutos"] == 180  # Mantido inalterado
+    assert body["ativo"] is False  # Atualizado
+
+
+@pytest.mark.asyncio
+async def test_editar_servico_com_nome_conflitante_deve_retornar_409(
+    async_client: AsyncClient, token_gerente: str
+):
+    """
+    Cenário: Gerente tenta renomear o Serviço A com o nome idêntico ao Serviço B já existente.
+    Resultado esperado: 409 Conflict prevenindo a duplicidade cadastral de chaves.
+    """
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+
+    # 1. Cadastra o Serviço A
+    await async_client.post(
+        "/servicos",
+        json={
+            "nome": "Higienização de Ar Gás",
+            "preco_mao_de_obra": 90.00,
+            "duracao_estimada_minutos": 30,
+        },
+        headers=headers,
+    )
+
+    # 2. Cadastra o Serviço B
+    res_b = await async_client.post(
+        "/servicos",
+        json={
+            "nome": "Instalação de Engate Traseiro",
+            "preco_mao_de_obra": 200.00,
+            "duracao_estimada_minutos": 60,
+        },
+        headers=headers,
+    )
+    servico_b_id = res_b.json()["id"]
+
+    # 3. Tenta renomear o Serviço B para "Higienização de Ar Gás" (Duplicidade!)
+    payload_edit = {"nome": "Higienização de Ar Gás"}
+    response = await async_client.put(
+        f"/servicos/{servico_b_id}", json=payload_edit, headers=headers
+    )
+
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert (
+        response.json()["detail"]
+        == "Já existe outro serviço cadastrado com este nome no catálogo."
+    )
+
+
+@pytest.mark.asyncio
+async def test_mecanico_nao_deve_conseguir_editar_servico(
+    async_client: AsyncClient, token_mecanico: str
+):
+    """
+    Cenário: Mecânico tenta reajustar o preço de uma mão de obra do catálogo geral.
+    Resultado esperado: 403 Forbidden pelo controle de papéis (RBAC).
+    """
+    headers = {"Authorization": f"Bearer {token_mecanico}"}
+    random_uuid = str(uuid7())
+
+    payload_edit = {"preco_mao_de_obra": 10.00}
+    response = await async_client.put(
+        f"/servicos/{random_uuid}", json=payload_edit, headers=headers
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
