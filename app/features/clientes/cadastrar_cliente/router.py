@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import obter_usuario_atual
@@ -25,7 +26,7 @@ router = APIRouter(prefix="/clientes", tags=["Clientes"])
 )
 async def cadastrar_cliente(
     payload: CadastrarClienteRequest,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
     usuario_logado: UsuarioToken = Depends(obter_usuario_atual),
 ):
     """

@@ -2,6 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Response, Cookie
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import obter_usuario_atual
@@ -16,9 +17,9 @@ router = APIRouter(prefix="/auth", tags=["Autenticação"])
 @router.post("/logout")
 async def logout(
     response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
     usuario_atual: UsuarioToken = Depends(obter_usuario_atual),
     refresh_token: str | None = Cookie(default=None),
-    db: AsyncSession = Depends(get_db),
 ):
     if refresh_token:
         token_hash = gerar_hash_token(refresh_token)

@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.rate_limiter import limiter, get_login_rate_limit_key
@@ -17,7 +18,7 @@ async def login(
     request: Request,
     response: Response,
     body: LoginRequest,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
     Realiza o login de operadores da oficina.

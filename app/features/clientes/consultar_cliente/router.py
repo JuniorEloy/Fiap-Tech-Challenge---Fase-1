@@ -1,12 +1,13 @@
 from uuid import UUID
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
-from ..repository import ClienteRepository
-from .handler import ConsultarClienteHandler
-from .schemas import ClienteResponse
+from app.features.clientes.repository import ClienteRepository
+from app.features.clientes.consultar_cliente.handler import ConsultarClienteHandler
+from app.features.clientes.consultar_cliente.schemas import ClienteResponse
 from app.shared.security.rbac import requer_roles
 from app.shared.security.roles import Role
 from app.shared.security.dependencies import obter_usuario_atual
@@ -27,7 +28,7 @@ router = APIRouter(
     dependencies=[Depends(requer_roles([Role.GERENTE]))],
 )
 async def listar_clientes(
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = ClienteRepository(db)
     handler = ConsultarClienteHandler(repo)
@@ -44,7 +45,7 @@ async def listar_clientes(
 )
 async def buscar_cliente_por_documento(
     documento: str,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = ClienteRepository(db)
     handler = ConsultarClienteHandler(repo)
@@ -62,8 +63,8 @@ async def buscar_cliente_por_documento(
 )
 async def buscar_cliente_por_id(
     cliente_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
     usuario_atual: UsuarioToken = Depends(obter_usuario_atual),
-    db: AsyncSession = Depends(get_db),
 ):
     # 🛡️ 2. Valida IDOR ANTES de ir ao banco de dados:
     # - Se for CLIENTE e cliente_id != usuario_atual.id -> Lança 403 Forbidden imediatamente!

@@ -1,5 +1,5 @@
 from datetime import timedelta
-
+from typing import Annotated
 from fastapi import (
     APIRouter,
     Cookie,
@@ -9,6 +9,7 @@ from fastapi import (
     Response,
     status,
 )
+from typing import Annotated
 from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,8 +41,8 @@ class TokenResponse(BaseModel):
 async def refresh_token(
     request: Request,
     response: Response,
+    db: Annotated[AsyncSession, Depends(get_db)],
     refresh_token: str | None = Cookie(default=None),
-    db: AsyncSession = Depends(get_db),
 ):
     if not refresh_token:
         raise HTTPException(

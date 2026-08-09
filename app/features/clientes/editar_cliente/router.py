@@ -1,11 +1,11 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import requer_roles
 from app.shared.security.roles import Role
-
 from app.features.clientes.repository import ClienteRepository
 from app.features.clientes.editar_cliente.handler import EditarClienteHandler
 from app.features.clientes.editar_cliente.schemas import (
@@ -24,7 +24,7 @@ router = APIRouter(prefix="/clientes", tags=["Clientes"])
 async def editar_cliente(
     id: UUID,
     payload: EditarClienteRequest,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
     current_user=Depends(
         requer_roles([Role.RECEPCIONISTA, Role.GERENTE])
     ),  # 👈 RBAC de segurança
