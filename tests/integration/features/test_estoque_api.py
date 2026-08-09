@@ -6,7 +6,6 @@ import asyncio
 from uuid import uuid7
 
 
-
 @pytest.mark.asyncio
 async def test_estoquista_deve_cadastrar_peca_com_sucesso(
     async_client: AsyncClient, token_estoquista: str
@@ -211,6 +210,7 @@ async def test_baixar_estoque_rbac_bloqueia_recepcionista(
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
+
 @pytest.mark.asyncio
 async def test_estoquista_deve_registrar_entrada_com_sucesso(
     async_client: AsyncClient, token_estoquista: str
@@ -228,19 +228,20 @@ async def test_estoquista_deve_registrar_entrada_com_sucesso(
         "quantidade_inicial": 5,
         "preco_venda": 45.00,
         "preco_custo": 20.00,
-        "limite_minimo": 15
+        "limite_minimo": 15,
     }
-    res_cadastro = await async_client.post("/estoque", json=payload_cadastro, headers=headers)
+    res_cadastro = await async_client.post(
+        "/estoque", json=payload_cadastro, headers=headers
+    )
     assert res_cadastro.status_code == status.HTTP_201_CREATED
     peca_id = res_cadastro.json()["id"]
     assert res_cadastro.json()["precisa_recompra"] is True
 
     # 2. Registra entrada de 20 unidades de saldo
-    payload_entrada = {
-        "peca_id": peca_id,
-        "quantidade": 20
-    }
-    response = await async_client.post("/estoque/entradas", json=payload_entrada, headers=headers)
+    payload_entrada = {"peca_id": peca_id, "quantidade": 20}
+    response = await async_client.post(
+        "/estoque/entradas", json=payload_entrada, headers=headers
+    )
 
     # 3. Validações finais de saldo e política de domínio
     assert response.status_code == status.HTTP_200_OK
@@ -264,9 +265,11 @@ async def test_registrar_entrada_com_quantidade_invalida_deve_retornar_422(
     headers = {"Authorization": f"Bearer {token_estoquista}"}
     payload_entrada = {
         "peca_id": str(uuid7()),
-        "quantidade": 0  # Quantidade inválida!
+        "quantidade": 0,  # Quantidade inválida!
     }
-    response = await async_client.post("/estoque/entradas", json=payload_entrada, headers=headers)
+    response = await async_client.post(
+        "/estoque/entradas", json=payload_entrada, headers=headers
+    )
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
@@ -279,9 +282,8 @@ async def test_mecanico_nao_deve_conseguir_registrar_entrada_estoque(
     Resultado esperado: 403 Forbidden pelo controle de segurança por papéis (RBAC).
     """
     headers = {"Authorization": f"Bearer {token_mecanico}"}
-    payload_entrada = {
-        "peca_id": str(uuid7()),
-        "quantidade": 10
-    }
-    response = await async_client.post("/estoque/entradas", json=payload_entrada, headers=headers)
+    payload_entrada = {"peca_id": str(uuid7()), "quantidade": 10}
+    response = await async_client.post(
+        "/estoque/entradas", json=payload_entrada, headers=headers
+    )
     assert response.status_code == status.HTTP_403_FORBIDDEN

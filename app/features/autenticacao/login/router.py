@@ -18,7 +18,7 @@ async def login(
     request: Request,
     response: Response,
     body: LoginRequest,
-    db: Annotated[AsyncSession, Depends(get_db)]
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
     Realiza o login de operadores da oficina.

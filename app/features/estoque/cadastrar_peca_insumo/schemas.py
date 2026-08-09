@@ -43,7 +43,7 @@ class PecaResponse(BaseModel):
 
     id: UUID
     nome: str
-    descricao: Optional[str] = None 
+    descricao: Optional[str] = None
     quantidade_em_estoque: int
     preco_custo: Decimal
     preco_venda: Decimal

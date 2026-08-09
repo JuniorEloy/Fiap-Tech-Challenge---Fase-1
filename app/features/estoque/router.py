@@ -7,7 +7,7 @@ from app.features.estoque.baixar_estoque.router import (
     router as baixar_estoque_router,
 )
 from app.features.estoque.registrar_entrada.router import (
-    router as registrar_entrada_router
+    router as registrar_entrada_router,
 )
 
 

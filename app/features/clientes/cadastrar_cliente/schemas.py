@@ -57,7 +57,7 @@ class ClienteResponse(BaseModel):
     tipo_pessoa: TipoPessoa
 
     model_config = ConfigDict(from_attributes=True)
-    
+
     # Customização para que a resposta exiba o CPF/CNPJ formatado de forma legível
     @field_validator("cpf_cnpj", mode="before")
     @classmethod

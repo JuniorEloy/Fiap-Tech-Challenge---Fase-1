@@ -21,7 +21,9 @@ router = APIRouter(prefix="/veiculos", tags=["Veículos"])
         Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE, Role.MECANICO]))
     ],
 )
-async def consultar_veiculo_por_placa(placa: str, db: Annotated[AsyncSession, Depends(get_db)]):
+async def consultar_veiculo_por_placa(
+    placa: str, db: Annotated[AsyncSession, Depends(get_db)]
+):
     """
     Busca um veículo cadastrado na oficina utilizando a placa de licença (Mercosul ou Tradicional).
     Acesso liberado para RECEPCIONISTA, GERENTE ou MECÂNICO.

@@ -25,7 +25,9 @@ router = APIRouter(prefix="/veiculos", tags=["Veículos"])
     dependencies=[Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE]))],
 )
 async def editar_veiculo(
-    id: UUID, payload: EditarVeiculoRequest, db: Annotated[AsyncSession, Depends(get_db)]
+    id: UUID,
+    payload: EditarVeiculoRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
     Edita os dados ou transfere a propriedade de um veículo cadastrado.

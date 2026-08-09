@@ -25,7 +25,9 @@ router = APIRouter(prefix="/usuarios", tags=["Gestão de Usuários"])
     ],  # 👈 Exclusividade total do Gerente!
 )
 async def editar_operador(
-    id: UUID, payload: EditarUsuarioRequest, db: Annotated[AsyncSession, Depends(get_db)]
+    id: UUID,
+    payload: EditarUsuarioRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """
     Atualiza os dados cadastrais, cargo (role) ou status de um operador da oficina.

@@ -1,13 +1,18 @@
 from fastapi import HTTPException, status
 from app.features.estoque.repository import EstoqueRepository
-from app.features.estoque.registrar_entrada.schemas import RegistrarEntradaRequest, RegistroEntradaResponse
+from app.features.estoque.registrar_entrada.schemas import (
+    RegistrarEntradaRequest,
+    RegistroEntradaResponse,
+)
 
 
 class RegistrarEntradaHandler:
     def __init__(self, repository: EstoqueRepository):
         self.repository = repository
 
-    async def executar(self, command: RegistrarEntradaRequest) -> RegistroEntradaResponse:
+    async def executar(
+        self, command: RegistrarEntradaRequest
+    ) -> RegistroEntradaResponse:
         """
         Orquestra o reabastecimento de saldo de forma segura contra concorrência:
         1. Carrega a peça com bloqueio pessimista (FOR UPDATE).
@@ -20,7 +25,7 @@ class RegistrarEntradaHandler:
         if not peca:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Peça/Insumo não encontrado no catálogo."
+                detail="Peça/Insumo não encontrado no catálogo.",
             )
 
         # 2. Registra o histórico de saldos
@@ -39,5 +44,5 @@ class RegistrarEntradaHandler:
             saldo_anterior=saldo_anterior,
             saldo_atual=peca.quantidade_em_estoque,
             limite_minimo=peca.limite_minimo,
-            precisa_recompra=peca.precisa_recompra
+            precisa_recompra=peca.precisa_recompra,
         )

@@ -7,7 +7,10 @@ from app.shared.security.roles import Role
 
 from app.features.estoque.repository import EstoqueRepository
 from app.features.estoque.registrar_entrada.handler import RegistrarEntradaHandler
-from app.features.estoque.registrar_entrada.schemas import RegistrarEntradaRequest, RegistroEntradaResponse
+from app.features.estoque.registrar_entrada.schemas import (
+    RegistrarEntradaRequest,
+    RegistroEntradaResponse,
+)
 
 router = APIRouter(prefix="/estoque", tags=["Gestão de Estoque"])
 
@@ -16,11 +19,10 @@ router = APIRouter(prefix="/estoque", tags=["Gestão de Estoque"])
     "/entradas",
     response_model=RegistroEntradaResponse,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(requer_roles([Role.ESTOQUISTA, Role.GERENTE]))]
+    dependencies=[Depends(requer_roles([Role.ESTOQUISTA, Role.GERENTE]))],
 )
 async def registrar_entrada_estoque(
-    payload: RegistrarEntradaRequest,
-    db: AsyncSession = Depends(get_db)
+    payload: RegistrarEntradaRequest, db: AsyncSession = Depends(get_db)
 ):
     """
     Registra a entrada física de novas unidades de uma peça no estoque.
