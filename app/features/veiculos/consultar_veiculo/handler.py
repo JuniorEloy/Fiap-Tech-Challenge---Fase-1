@@ -17,7 +17,7 @@ class ConsultarVeiculoHandler:
             placa_vo = Placa(placa_str)
         except ValueError as exc:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
             )
 
         veiculo = await self.repository.buscar_por_placa(placa_vo.valor)

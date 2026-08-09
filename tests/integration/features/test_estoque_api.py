@@ -58,7 +58,7 @@ async def test_cadastrar_peca_com_preco_venda_inferior_ao_custo_deve_retornar_42
     }
 
     response = await async_client.post("/estoque", json=payload, headers=headers)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
     assert "preco_venda" in response.text
 
 

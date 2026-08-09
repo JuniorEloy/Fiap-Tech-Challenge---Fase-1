@@ -117,7 +117,7 @@ async def test_cadastrar_operador_com_payload_invalido_deve_retornar_422(
         ENDPOINT_USUARIOS, json=payload_incompleto, headers=headers
     )
 
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio

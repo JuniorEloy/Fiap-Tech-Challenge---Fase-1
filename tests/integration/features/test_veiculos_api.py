@@ -119,7 +119,7 @@ async def test_cadastrar_veiculo_placa_invalida_deve_retornar_422(
     response = await async_client.post(
         "/veiculos", json=payload_veiculo, headers=headers
     )
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio
@@ -195,7 +195,7 @@ async def test_consultar_veiculo_com_placa_invalida_deve_retornar_422(
     """
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
     response = await async_client.get("/veiculos/placa/placa-com-erro", headers=headers)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio

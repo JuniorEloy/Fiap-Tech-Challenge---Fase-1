@@ -75,7 +75,7 @@ async def test_cadastrar_cliente_com_documento_invalido_deve_retornar_422(
 
     response = await async_client.post("/clientes", json=payload, headers=headers)
 
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio
