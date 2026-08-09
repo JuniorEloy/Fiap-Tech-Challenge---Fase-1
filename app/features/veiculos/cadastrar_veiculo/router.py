@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import requer_roles
@@ -25,7 +26,7 @@ router = APIRouter(prefix="/veiculos", tags=["Veículos"])
     ],  # 👈 Bloqueia Mecânicos/Clientes/Estoquistas!
 )
 async def cadastrar_veiculo(
-    payload: CadastrarVeiculoRequest, db: AsyncSession = Depends(get_db)
+    payload: CadastrarVeiculoRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
     Registra um novo veículo associado a um cliente.

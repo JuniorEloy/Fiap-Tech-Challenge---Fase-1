@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import requer_roles
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/estoque", tags=["Gestão de Estoque"])
     ],  # 👈 Restringe Mecânicos e Recepcionistas!
 )
 async def cadastrar_peca_insumo(
-    payload: CadastrarPecaRequest, db: AsyncSession = Depends(get_db)
+    payload: CadastrarPecaRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
     Cadastra uma nova peça ou insumo de manutenção no catálogo da oficina.

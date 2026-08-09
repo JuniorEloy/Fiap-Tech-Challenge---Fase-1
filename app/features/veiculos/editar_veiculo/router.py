@@ -1,6 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import requer_roles
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/veiculos", tags=["Veículos"])
     dependencies=[Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE]))],
 )
 async def editar_veiculo(
-    id: UUID, payload: EditarVeiculoRequest, db: AsyncSession = Depends(get_db)
+    id: UUID, payload: EditarVeiculoRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
     Edita os dados ou transfere a propriedade de um veículo cadastrado.

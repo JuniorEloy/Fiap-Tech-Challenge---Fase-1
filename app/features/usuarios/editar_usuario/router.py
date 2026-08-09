@@ -1,6 +1,7 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import requer_roles
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/usuarios", tags=["Gestão de Usuários"])
     ],  # 👈 Exclusividade total do Gerente!
 )
 async def editar_operador(
-    id: UUID, payload: EditarUsuarioRequest, db: AsyncSession = Depends(get_db)
+    id: UUID, payload: EditarUsuarioRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
     Atualiza os dados cadastrais, cargo (role) ou status de um operador da oficina.

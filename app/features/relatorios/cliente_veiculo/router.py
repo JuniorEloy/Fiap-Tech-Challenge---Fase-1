@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import requer_roles
@@ -21,7 +22,7 @@ router = APIRouter(prefix="/relatorio", tags=["Relatórios & Métricas"])
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(requer_roles([Role.GERENTE]))],
 )
-async def obter_relatorio_cliente_veiculo(db: AsyncSession = Depends(get_db)):
+async def obter_relatorio_cliente_veiculo(db: Annotated[AsyncSession, Depends(get_db)]):
     """
     Retorna o relatório executivo completo de Veículos e Clientes cadastrados.
     Endpoint restrito de controle e análise operacional.

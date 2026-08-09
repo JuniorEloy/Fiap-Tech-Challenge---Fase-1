@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import requer_roles
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/estoque", tags=["Gestão de Estoque"])
     dependencies=[Depends(requer_roles([Role.MECANICO, Role.GERENTE]))],
 )
 async def baixar_saldo_estoque(
-    payload: BaixarEstoqueRequest, db: AsyncSession = Depends(get_db)
+    payload: BaixarEstoqueRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
     Deduz saldo físico de peças e insumos do estoque da oficina.

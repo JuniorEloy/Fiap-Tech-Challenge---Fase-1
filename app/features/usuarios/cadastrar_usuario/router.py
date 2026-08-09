@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
 
 from app.shared.infra.db.database import get_db
 from app.shared.security.dependencies import requer_roles
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/usuarios", tags=["Gestão de Usuários"])
     ],
 )
 async def cadastrar_operador(
-    body: CriarUsuarioRequest, db: AsyncSession = Depends(get_db)
+    body: CriarUsuarioRequest, db: Annotated[AsyncSession, Depends(get_db)]
 ):
     """
     Cadastra um novo operador no sistema administrativo da oficina.
