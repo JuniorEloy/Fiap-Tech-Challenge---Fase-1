@@ -1,23 +1,23 @@
-from typing import List, Sequence
+from typing import Sequence
 from uuid import UUID
 import jwt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials 
+from typing import Annotated
 
 from app.shared.security.roles import Role
 from app.shared.security.schemas import UsuarioToken
 from app.shared.security.tokens import decodificar_token
 
-# Integração nativa do Swagger UI com o endpoint de login
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+security_scheme = HTTPBearer(auto_error=False)
 
 
 def obter_usuario_atual(
-    token: str = Depends(oauth2_scheme),
+    token_auth: Annotated[HTTPAuthorizationCredentials | None, Depends(security_scheme)],
 ) -> UsuarioToken:
     """
     Extrai o token JWT enviado no cabeçalho Authorization e converte
-    no objeto fortemente tipado UsuarioToken.
+    no objeto fortemente tipado UsuarioToken de forma síncrona.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -25,8 +25,12 @@ def obter_usuario_atual(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    try:
-        payload = decodificar_token(token)
+    if not token_auth:
+        raise credentials_exception
+
+    try:        
+        token_bruto = token_auth.credentials
+        payload = decodificar_token(token_bruto)
 
         if not payload or payload.get("type") != "access":
             raise credentials_exception
