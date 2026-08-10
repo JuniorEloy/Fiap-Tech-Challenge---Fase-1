@@ -101,7 +101,7 @@ async def test_cadastrar_servico_com_valores_invalidos_deve_retornar_422(
     }
 
     response = await async_client.post("/servicos", json=payload, headers=headers)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio

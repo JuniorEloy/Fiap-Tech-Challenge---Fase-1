@@ -270,7 +270,7 @@ async def test_registrar_entrada_com_quantidade_invalida_deve_retornar_422(
     response = await async_client.post(
         "/estoque/entradas", json=payload_entrada, headers=headers
     )
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio
