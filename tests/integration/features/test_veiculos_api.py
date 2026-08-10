@@ -78,7 +78,7 @@ async def test_cadastrar_veiculo_mercosul_com_sucesso(
 
     # 2. Cadastramos o veículo com placa Mercosul (Letras minúsculas e números alternados)
     payload_veiculo = {
-        "placa": "abc1d23",  # Letras minúsculas sem hífen
+        "placa": "mrc1b23",  
         "marca": "Chevrolet",
         "modelo": "Onix",
         "ano": 2022,
@@ -95,7 +95,7 @@ async def test_cadastrar_veiculo_mercosul_com_sucesso(
     assert body["marca"] == "Chevrolet"
     assert body["modelo"] == "Onix"
     # A placa Mercosul não é formatada com hífen, mas deve vir em maiúsculas
-    assert body["placa"] == "ABC1D23"
+    assert body["placa"] == "MRC1B23"
 
 
 @pytest.mark.asyncio

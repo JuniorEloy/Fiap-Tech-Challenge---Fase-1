@@ -15,7 +15,7 @@ async def test_recepcionista_deve_cadastrar_servico_com_sucesso(
     """
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
     payload = {
-        "nome": "Alinhamento e Balanceamento 3D",
+        "nome": "Alinhamento e Balanceamento 4D",
         "descricao": "Alinhamento completo computadorizado de eixos e balanceamento de rodas",
         "preco_mao_de_obra": 120.00,
         "duracao_estimada_minutos": 45,
@@ -26,7 +26,7 @@ async def test_recepcionista_deve_cadastrar_servico_com_sucesso(
 
     body = response.json()
     assert "id" in body
-    assert body["nome"] == "Alinhamento e Balanceamento 3D"
+    assert body["nome"] == "Alinhamento e Balanceamento 4D"
     assert (
         body["descricao"]
         == "Alinhamento completo computadorizado de eixos e balanceamento de rodas"
