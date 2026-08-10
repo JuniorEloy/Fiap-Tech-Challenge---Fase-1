@@ -70,7 +70,7 @@ async def refresh_token(
 
     if sessao.revogado:
         data_revogacao = sessao.revogado_em or sessao.created_at
-        
+
         # Garante compatibilidade de timezone na comparação de revogação
         if data_revogacao.tzinfo is not None and agora.tzinfo is not None:
             data_revogacao_comp = data_revogacao

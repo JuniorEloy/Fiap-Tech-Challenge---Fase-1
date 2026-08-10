@@ -317,3 +317,95 @@ async def test_mecanico_nao_deve_conseguir_editar_servico(
         f"/servicos/{random_uuid}", json=payload_edit, headers=headers
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_listar_servicos_deve_retornar_todos_itens_ordenados_alfabeticamente(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Solicitar listagem de serviços sem filtros adicionais.
+    Resultado esperado: 200 OK com os itens cadastrados retornados.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+
+    # Cadastra dois serviços de referência
+    payload_a = {
+        "nome": "B_Servico_Beta",
+        "preco_mao_de_obra": 100.00,
+        "duracao_estimada_minutos": 30,
+    }
+    payload_b = {
+        "nome": "A_Servico_Alfa",
+        "preco_mao_de_obra": 200.00,
+        "duracao_estimada_minutos": 45,
+    }
+    await async_client.post("/servicos", json=payload_a, headers=headers)
+    await async_client.post("/servicos", json=payload_b, headers=headers)
+
+    response = await async_client.get("/servicos", headers=headers)
+    assert response.status_code == status.HTTP_200_OK
+
+    body = response.json()
+    assert len(body) >= 2
+
+    # Valida ordenação alfabética (A_Servico_Alfa deve vir antes de B_Servico_Beta)
+    nomes = [
+        item["nome"]
+        for item in body
+        if item["nome"] in ["A_Servico_Alfa", "B_Servico_Beta"]
+    ]
+    assert nomes == ["A_Servico_Alfa", "B_Servico_Beta"]
+
+
+@pytest.mark.asyncio
+async def test_listar_servicos_com_filtro_busca_deve_retornar_apenas_correspondentes(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Filtrar os serviços do catálogo por busca textual.
+    Resultado esperado: 200 OK contendo apenas registros cujo nome ou descrição possuam a palavra-chave.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+
+    payload_1 = {
+        "nome": "Instalação de Insulfilm G5",
+        "descricao": "Película de controle solar e privacidade para vidros laterais e traseiro",
+        "preco_mao_de_obra": 250.00,
+        "duracao_estimada_minutos": 90,
+    }
+    payload_2 = {
+        "nome": "Polimento Técnico Premium",
+        "descricao": "Remoção de micro-riscos e vitrificação de pintura automotiva",
+        "preco_mao_de_obra": 350.00,
+        "duracao_estimada_minutos": 180,
+    }
+    await async_client.post("/servicos", json=payload_1, headers=headers)
+    await async_client.post("/servicos", json=payload_2, headers=headers)
+
+    # Filtrar por "Insulfilm"
+    res_busca_1 = await async_client.get("/servicos?busca=Insulfilm", headers=headers)
+    assert res_busca_1.status_code == status.HTTP_200_OK
+    body_1 = res_busca_1.json()
+    assert any(item["nome"] == "Instalação de Insulfilm G5" for item in body_1)
+    assert not any(item["nome"] == "Polimento Técnico Premium" for item in body_1)
+
+    # Filtrar por "pintura" (busca textual na descrição - case insensitive)
+    res_busca_2 = await async_client.get("/servicos?busca=pintura", headers=headers)
+    assert res_busca_2.status_code == status.HTTP_200_OK
+    body_2 = res_busca_2.json()
+    assert any(item["nome"] == "Polimento Técnico Premium" for item in body_2)
+    assert not any(item["nome"] == "Instalação de Insulfilm G5" for item in body_2)
+
+
+@pytest.mark.asyncio
+async def test_estoquista_nao_deve_conseguir_listar_servicos(
+    async_client: AsyncClient, token_estoquista: str
+):
+    """
+    Cenário: Papel de Estoquista tenta listar serviços do catálogo da oficina.
+    Resultado esperado: 403 Forbidden.
+    """
+    headers = {"Authorization": f"Bearer {token_estoquista}"}
+    response = await async_client.get("/servicos", headers=headers)
+    assert response.status_code == status.HTTP_403_FORBIDDEN

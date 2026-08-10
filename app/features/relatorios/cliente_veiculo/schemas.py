@@ -2,8 +2,10 @@ from uuid import UUID
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
+
 class VeiculoRelatorioDTO(BaseModel):
     """Estrutura analítica de dados do veículo."""
+
     id: UUID
     placa: str
     marca: str
@@ -15,19 +17,21 @@ class VeiculoRelatorioDTO(BaseModel):
 
 class ClienteRelatorioDTO(BaseModel):
     """Representação rica do cliente contendo seus veículos aninhados."""
+
     id: UUID
     nome: str
     email: str
-    telefone: str  
+    telefone: str
     cpf_cnpj: str
     total_veiculos: int
-    veiculos: List[VeiculoRelatorioDTO] = []  
+    veiculos: List[VeiculoRelatorioDTO] = []
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class RelatorioClienteVeiculoResponse(BaseModel):
     """DTO Principal de Resposta do Relatório de Gerência."""
+
     total_clientes: int
     total_veiculos: int
     clientes: List[ClienteRelatorioDTO]

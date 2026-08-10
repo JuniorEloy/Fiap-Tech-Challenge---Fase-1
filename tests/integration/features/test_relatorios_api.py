@@ -13,18 +13,20 @@ async def test_gerente_deve_conseguir_acessar_relatorio_cliente_veiculo_com_suce
     Resultado esperado: 200 OK com totais e veículos aninhados dentro de cada cliente correspondente.
     """
     headers = {"Authorization": f"Bearer {token_gerente}"}
-    
+
     response = await async_client.get("/relatorio/cliente-veiculo", headers=headers)
     assert response.status_code == status.HTTP_200_OK
-    
+
     body = response.json()
     assert "total_clientes" in body
     assert "total_veiculos" in body
     assert isinstance(body["clientes"], list)
-    
+
     # 🌟 A validação agora atesta que veículos estão aninhados sob cada cliente!
-    assert "veiculos" not in body  # Não deve mais existir uma chave flat "veiculos" na raiz
-    
+    assert (
+        "veiculos" not in body
+    )  # Não deve mais existir uma chave flat "veiculos" na raiz
+
     for cliente in body["clientes"]:
         assert "id" in cliente
         assert "nome" in cliente
@@ -45,6 +47,6 @@ async def test_recepcionista_nao_deve_acessar_relatorio_do_gerente(
     Resultado esperado: 403 Forbidden (Controle RBAC atuando adequadamente).
     """
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
-    
+
     response = await async_client.get("/relatorio/cliente-veiculo", headers=headers)
     assert response.status_code == status.HTTP_403_FORBIDDEN

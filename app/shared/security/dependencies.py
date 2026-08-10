@@ -2,7 +2,7 @@ from typing import Sequence
 from uuid import UUID
 import jwt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials 
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Annotated
 
 from app.shared.security.roles import Role
@@ -13,7 +13,9 @@ security_scheme = HTTPBearer(auto_error=False)
 
 
 def obter_usuario_atual(
-    token_auth: Annotated[HTTPAuthorizationCredentials | None, Depends(security_scheme)],
+    token_auth: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(security_scheme)
+    ],
 ) -> UsuarioToken:
     """
     Extrai o token JWT enviado no cabeçalho Authorization e converte
@@ -28,7 +30,7 @@ def obter_usuario_atual(
     if not token_auth:
         raise credentials_exception
 
-    try:        
+    try:
         token_bruto = token_auth.credentials
         payload = decodificar_token(token_bruto)
 

@@ -6,7 +6,7 @@ from app.features.veiculos.models import Veiculo
 from app.features.relatorios.cliente_veiculo.schemas import (
     RelatorioClienteVeiculoResponse,
     ClienteRelatorioDTO,
-    VeiculoRelatorioDTO
+    VeiculoRelatorioDTO,
 )
 from app.shared.domain.value_objects.cpf_cnpj import CpfCnpj
 from app.shared.domain.value_objects.telefone import Telefone
@@ -30,17 +30,14 @@ class RelatorioClienteVeiculoQueryService:
         total_veiculos = total_vei_res.scalar_one()
 
         # 2. Busca e mapeia todos os veículos vinculando os nomes dos proprietários
-        query_veiculos = (
-            select(
-                Veiculo.id,
-                Veiculo.placa,
-                Veiculo.marca,
-                Veiculo.modelo,
-                Veiculo.cliente_id,
-                Cliente.nome.label("nome_proprietario")
-            )
-            .join(Cliente, Veiculo.cliente_id == Cliente.id)
-        )
+        query_veiculos = select(
+            Veiculo.id,
+            Veiculo.placa,
+            Veiculo.marca,
+            Veiculo.modelo,
+            Veiculo.cliente_id,
+            Cliente.nome.label("nome_proprietario"),
+        ).join(Cliente, Veiculo.cliente_id == Cliente.id)
         res_veiculos = await self.db.execute(query_veiculos)
 
         # Agrupamento eficiente em memória usando defaultdict
@@ -51,7 +48,7 @@ class RelatorioClienteVeiculoQueryService:
                 placa=Placa(row.placa).formatada,
                 marca=row.marca,
                 modelo=row.modelo,
-                nome_proprietario=row.nome_proprietario
+                nome_proprietario=row.nome_proprietario,
             )
             veiculos_por_cliente[row.cliente_id].append(dto_veiculo)
 
@@ -63,10 +60,16 @@ class RelatorioClienteVeiculoQueryService:
                 Cliente.email,
                 Cliente.telefone,
                 Cliente.cpf_cnpj,
-                func.count(Veiculo.id).label("total_veiculos")
+                func.count(Veiculo.id).label("total_veiculos"),
             )
             .outerjoin(Veiculo, Veiculo.cliente_id == Cliente.id)
-            .group_by(Cliente.id, Cliente.nome, Cliente.email, Cliente.telefone, Cliente.cpf_cnpj)
+            .group_by(
+                Cliente.id,
+                Cliente.nome,
+                Cliente.email,
+                Cliente.telefone,
+                Cliente.cpf_cnpj,
+            )
         )
         res_clientes = await self.db.execute(query_clientes)
 
@@ -79,15 +82,15 @@ class RelatorioClienteVeiculoQueryService:
                 id=row.id,
                 nome=row.nome,
                 email=row.email,
-                telefone=Telefone(row.telefone).formatado,  
-                cpf_cnpj=CpfCnpj(row.cpf_cnpj).formatado,   
+                telefone=Telefone(row.telefone).formatado,
+                cpf_cnpj=CpfCnpj(row.cpf_cnpj).formatado,
                 total_veiculos=row.total_veiculos,
-                veiculos=veiculos_do_cliente               
+                veiculos=veiculos_do_cliente,
             )
             clientes_list.append(dto_cliente)
 
         return RelatorioClienteVeiculoResponse(
             total_clientes=total_clientes,
             total_veiculos=total_veiculos,
-            clientes=clientes_list
+            clientes=clientes_list,
         )

@@ -78,7 +78,7 @@ async def test_cadastrar_veiculo_mercosul_com_sucesso(
 
     # 2. Cadastramos o veículo com placa Mercosul (Letras minúsculas e números alternados)
     payload_veiculo = {
-        "placa": "mrc1b23",  
+        "placa": "mrc1b23",
         "marca": "Chevrolet",
         "modelo": "Onix",
         "ano": 2022,
