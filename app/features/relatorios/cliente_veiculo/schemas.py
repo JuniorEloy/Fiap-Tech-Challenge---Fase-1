@@ -1,32 +1,11 @@
 from uuid import UUID
-from typing import List
-from pydantic import BaseModel, Field, ConfigDict
-
-
-class ClienteRelatorioDTO(BaseModel):
-    """Representação consolidada e formatada do cliente para fins de auditoria."""
-
-    id: UUID
-    nome: str
-    email: str
-    telefone: str = Field(
-        ..., description="Telefone higienizado e formatado com DDD/máscara"
-    )
-    cpf_cnpj: str = Field(
-        ..., description="Documento do cliente com máscara de pontuação"
-    )
-    total_veiculos: int
-
-    model_config = ConfigDict(from_attributes=True)
-
+from typing import List, Optional
+from pydantic import BaseModel, ConfigDict
 
 class VeiculoRelatorioDTO(BaseModel):
-    """Representação direta do veículo associado ao seu proprietário."""
-
+    """Estrutura analítica de dados do veículo."""
     id: UUID
-    placa: str = Field(
-        ..., description="Placa higienizada e formatada no padrão Mercosul ou antigo"
-    )
+    placa: str
     marca: str
     modelo: str
     nome_proprietario: str
@@ -34,12 +13,23 @@ class VeiculoRelatorioDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class RelatorioClienteVeiculoResponse(BaseModel):
-    """Resposta unificada do relatório de faturamento e frota da oficina."""
+class ClienteRelatorioDTO(BaseModel):
+    """Representação rica do cliente contendo seus veículos aninhados."""
+    id: UUID
+    nome: str
+    email: str
+    telefone: str  
+    cpf_cnpj: str
+    total_veiculos: int
+    veiculos: List[VeiculoRelatorioDTO] = []  
 
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RelatorioClienteVeiculoResponse(BaseModel):
+    """DTO Principal de Resposta do Relatório de Gerência."""
     total_clientes: int
     total_veiculos: int
     clientes: List[ClienteRelatorioDTO]
-    veiculos: List[VeiculoRelatorioDTO]
 
     model_config = ConfigDict(from_attributes=True)
