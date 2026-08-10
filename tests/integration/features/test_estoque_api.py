@@ -287,3 +287,92 @@ async def test_mecanico_nao_deve_conseguir_registrar_entrada_estoque(
         "/estoque/entradas", json=payload_entrada, headers=headers
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_estoquista_deve_conseguir_consultar_relatorio_estoque_baixo_com_sucesso(
+    async_client: AsyncClient, token_estoquista: str
+):
+    """
+    Cenário: Estoquista solicita o relatório de itens críticos que precisam de reposição.
+    Resultado esperado: 200 OK com os itens que estão abaixo do limite mínimo listados
+                        e o custo total calculado corretamente.
+    """
+    headers = {"Authorization": f"Bearer {token_estoquista}"}
+
+    # 1. Cadastra uma peça segura (quantidade_inicial 20 > limite_minimo 10)
+    payload_seguro = {
+        "nome": "Aditivo de Radiador TecnoFlu",
+        "descricao": "Aditivo de arrefecimento orgânico concentrado",
+        "preco_custo": 25.00,
+        "preco_venda": 49.90,
+        "quantidade_inicial": 20,
+        "limite_minimo": 10,
+    }
+    res_seguro = await async_client.post(
+        "/estoque", json=payload_seguro, headers=headers
+    )
+    assert res_seguro.status_code == status.HTTP_201_CREATED
+
+    # 2. Cadastra uma peça crítica (quantidade_inicial 5 < limite_minimo 15)
+    # Déficit: 10 unidades. Custo reposição estimado: 10 * 80.00 = R$ 800.00
+    payload_critico = {
+        "nome": "Disco de Freio Dianteiro Varga",
+        "descricao": "Disco de freio ventilado para utilitários",
+        "preco_custo": 80.00,
+        "preco_venda": 150.00,
+        "quantidade_inicial": 5,
+        "limite_minimo": 15,
+    }
+    res_critico = await async_client.post(
+        "/estoque", json=payload_critico, headers=headers
+    )
+    assert res_critico.status_code == status.HTTP_201_CREATED
+    peca_critica_id = res_critico.json()["id"]
+
+    # 3. Solicita o relatório de estoque baixo
+    response = await async_client.get("/estoque/relatorios/baixo", headers=headers)
+
+    # 4. Validações analíticas da resposta
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+
+    assert body["total_itens_criticos"] >= 1
+    # Garante que a peça confortável (Aditivo) NÃO está na lista crítica
+    nomes_criticos = [item["nome"] for item in body["itens"]]
+    assert "Aditivo de Radiador TecnoFlu" not in nomes_criticos
+
+    # Garante que a peça crítica (Disco) está listada com os cálculos corretos
+    disco_item = next(item for item in body["itens"] if item["id"] == peca_critica_id)
+    assert disco_item["nome"] == "Disco de Freio Dianteiro Varga"
+    assert disco_item["quantidade_em_estoque"] == 5
+    assert disco_item["limite_minimo"] == 15
+    assert disco_item["unidades_em_falta"] == 10
+    assert disco_item["preco_custo_referencia"] == "80.00"
+    assert disco_item["capital_necessario_reposicao"] == "800.00"
+
+
+@pytest.mark.asyncio
+async def test_gerente_deve_acessar_relatorio_estoque_baixo(
+    async_client: AsyncClient, token_gerente: str
+):
+    """
+    Cenário: Gerente acessa o relatório de estoque baixo para planejar fluxo financeiro de compras.
+    Resultado esperado: 200 OK com sucesso.
+    """
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    response = await async_client.get("/estoque/relatorios/baixo", headers=headers)
+    assert response.status_code == status.HTTP_200_OK
+
+
+@pytest.mark.asyncio
+async def test_mecanico_nao_deve_ter_acesso_ao_relatorio_de_estoque_baixo(
+    async_client: AsyncClient, token_mecanico: str
+):
+    """
+    Cenário: Mecânico tenta acessar o relatório financeiro de reabastecimento.
+    Resultado esperado: 403 Forbidden (RBAC blinda a informação de faturamento corporativo).
+    """
+    headers = {"Authorization": f"Bearer {token_mecanico}"}
+    response = await async_client.get("/estoque/relatorios/baixo", headers=headers)
+    assert response.status_code == status.HTTP_403_FORBIDDEN

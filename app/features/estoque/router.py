@@ -9,7 +9,9 @@ from app.features.estoque.baixar_estoque.router import (
 from app.features.estoque.registrar_entrada.router import (
     router as registrar_entrada_router,
 )
-
+from app.features.estoque.relatorio_estoque_baixo.router import (
+    router as relatorio_estoque_baixo_router,
+)
 
 estoque_router = APIRouter()
 
@@ -17,3 +19,4 @@ estoque_router = APIRouter()
 estoque_router.include_router(cadastrar_peca_insumo_router)
 estoque_router.include_router(baixar_estoque_router)
 estoque_router.include_router(registrar_entrada_router)
+estoque_router.include_router(relatorio_estoque_baixo_router)
