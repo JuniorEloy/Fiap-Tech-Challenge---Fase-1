@@ -9,7 +9,6 @@ from fastapi import (
     Response,
     status,
 )
-from typing import Annotated
 from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,8 +70,16 @@ async def refresh_token(
 
     if sessao.revogado:
         data_revogacao = sessao.revogado_em or sessao.created_at
+        
+        # Garante compatibilidade de timezone na comparação de revogação
+        if data_revogacao.tzinfo is not None and agora.tzinfo is not None:
+            data_revogacao_comp = data_revogacao
+            agora_comp = agora
+        else:
+            data_revogacao_comp = data_revogacao.replace(tzinfo=None)
+            agora_comp = agora.replace(tzinfo=None)
 
-        if data_revogacao >= agora - timedelta(seconds=10):
+        if data_revogacao_comp >= agora_comp - timedelta(seconds=10):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Refresh Token já utilizado.",
@@ -97,7 +104,16 @@ async def refresh_token(
             detail="Violação de segurança detectada (reuso de token). Faça login novamente.",
         )
 
-    if sessao.expira_em < agora:
+    # Normalização segura para evitar conflito de tzinfo (offset-naive vs offset-aware) na expiração
+    expira_em_val = sessao.expira_em
+    if expira_em_val.tzinfo is not None and agora.tzinfo is not None:
+        exp_comp = expira_em_val
+        agora_exp_comp = agora
+    else:
+        exp_comp = expira_em_val.replace(tzinfo=None)
+        agora_exp_comp = agora.replace(tzinfo=None)
+
+    if exp_comp < agora_exp_comp:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sessão expirada. Por favor, efetue login novamente.",
