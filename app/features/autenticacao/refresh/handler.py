@@ -15,6 +15,8 @@ from app.shared.security.tokens import (
     gerar_hash_token,
 )
 
+MSG_SESSAO_INVALIDA = "Sessão de refresh inválida, expirada ou revogada."
+
 
 class RefreshHandler:
     def __init__(self, db: AsyncSession):
@@ -44,7 +46,7 @@ class RefreshHandler:
         if not sessao or sessao.expira_em < self.clock.agora():
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Sessão de refresh inválida, expirada ou revogada.",
+                detail=MSG_SESSAO_INVALIDA,
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
@@ -84,7 +86,7 @@ class RefreshHandler:
                 # mas não revoga as demais sessões do usuário ativo!
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Sessão de refresh inválida, expirada ou revogada.",
+                    detail=MSG_SESSAO_INVALIDA,
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
@@ -92,7 +94,7 @@ class RefreshHandler:
         if not sessao or sessao.revogado or sessao.expira_em < self.clock.agora():
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Sessão de refresh inválida, expirada ou revogada.",
+                detail=MSG_SESSAO_INVALIDA,
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
