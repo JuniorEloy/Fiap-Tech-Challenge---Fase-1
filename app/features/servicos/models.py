@@ -32,7 +32,7 @@ class ServicoBase(Base):
         Boolean,
         nullable=False,
         default=False,
-        comment="Flag indicando se este serviço é expresso e pula a etapa de diagnóstico físico pelo mecânico"
+        comment="Flag indicando se este serviço é expresso e pula a etapa de diagnóstico físico pelo mecânico",
     )
 
     def __repr__(self) -> str:

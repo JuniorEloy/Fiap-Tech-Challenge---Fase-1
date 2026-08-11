@@ -13,7 +13,6 @@ from app.shared.domain.value_objects.email import Email
 
 
 class EditarClienteHandler:
-
     def __init__(self, repository: ClienteRepository):
         self.repository = repository
 
@@ -24,11 +23,15 @@ class EditarClienteHandler:
         Orquestra a edição cadastral do cliente de forma modularizada.
         """
         cliente = await self._buscar_cliente_ou_404(cliente_id)
-        
+
         email_limpo = self._higienizar_e_validar_email(command.email)
 
-        await self._validar_conflitos_email(email_limpo, cliente_id, cliente.email, cliente.usuario_id)
-        await self._validar_conflito_documento(command.cpf_cnpj, cliente.cpf_cnpj, cliente_id)
+        await self._validar_conflitos_email(
+            email_limpo, cliente_id, cliente.email, cliente.usuario_id
+        )
+        await self._validar_conflito_documento(
+            command.cpf_cnpj, cliente.cpf_cnpj, cliente_id
+        )
 
         usuario = await self._buscar_usuario_associado(cliente.usuario_id)
 
@@ -57,13 +60,19 @@ class EditarClienteHandler:
             )
 
     async def _validar_conflitos_email(
-        self, email_limpo: str | None, cliente_id: UUID, email_atual: str, usuario_id: UUID
+        self,
+        email_limpo: str | None,
+        cliente_id: UUID,
+        email_atual: str,
+        usuario_id: UUID,
     ):
         if email_limpo is None or email_limpo == email_atual:
             return
 
         # Verifica conflito em Clientes
-        query_cli = select(Cliente).where(Cliente.email == email_limpo, Cliente.id != cliente_id)
+        query_cli = select(Cliente).where(
+            Cliente.email == email_limpo, Cliente.id != cliente_id
+        )
         res_cli = await self.repository.db.execute(query_cli)
         if res_cli.scalars().first():
             raise HTTPException(
@@ -72,7 +81,9 @@ class EditarClienteHandler:
             )
 
         # Verifica conflito em Usuários
-        query_usr = select(Usuario).where(Usuario.email == email_limpo, Usuario.id != usuario_id)
+        query_usr = select(Usuario).where(
+            Usuario.email == email_limpo, Usuario.id != usuario_id
+        )
         res_usr = await self.repository.db.execute(query_usr)
         if res_usr.scalars().first():
             raise HTTPException(
@@ -80,7 +91,9 @@ class EditarClienteHandler:
                 detail="O e-mail informado já está em uso por outro usuário.",
             )
 
-    async def _validar_conflito_documento(self, cpf_cnpj_novo: str | None, cpf_cnpj_atual: str, cliente_id: UUID):
+    async def _validar_conflito_documento(
+        self, cpf_cnpj_novo: str | None, cpf_cnpj_atual: str, cliente_id: UUID
+    ):
         if not cpf_cnpj_novo or cpf_cnpj_novo == cpf_cnpj_atual:
             return
 
@@ -97,7 +110,11 @@ class EditarClienteHandler:
         return result.scalar_one_or_none()
 
     def _aplicar_atualizacoes(
-        self, cliente: Cliente, usuario: Usuario | None, command: EditarClienteRequest, email_limpo: str | None
+        self,
+        cliente: Cliente,
+        usuario: Usuario | None,
+        command: EditarClienteRequest,
+        email_limpo: str | None,
     ):
         if command.nome is not None:
             cliente.nome = command.nome
