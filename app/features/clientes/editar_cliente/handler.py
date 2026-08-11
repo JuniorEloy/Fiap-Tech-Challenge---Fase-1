@@ -2,19 +2,18 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import select
 
-from app.features.clientes.repository import ClienteRepository
 from app.features.clientes.models import Cliente
+from app.features.usuarios.models import Usuario
+from app.features.clientes.repository import ClienteRepository
 from app.features.clientes.editar_cliente.schemas import (
     EditarClienteRequest,
     ClienteEditadoResponse,
-)
-from app.features.usuarios.models import (
-    Usuario,
 )
 from app.shared.domain.value_objects.email import Email
 
 
 class EditarClienteHandler:
+
     def __init__(self, repository: ClienteRepository):
         self.repository = repository
 
@@ -22,72 +21,84 @@ class EditarClienteHandler:
         self, cliente_id: UUID, command: EditarClienteRequest
     ) -> ClienteEditadoResponse:
         """
-        Orquestra a edição cadastral do cliente:
-        1. Busca o cliente pelo ID.
-        2. Valida duplicidade de e-mail e documento (se alterados).
-        3. Atualiza os dados de negócio do Cliente.
-        4. Sincroniza dados de login (nome, email) no Usuário vinculado.
-        5. Persiste as modificações.
+        Orquestra a edição cadastral do cliente de forma modularizada.
         """
-        # 1. Busca o cliente
+        cliente = await self._buscar_cliente_ou_404(cliente_id)
+        
+        email_limpo = self._higienizar_e_validar_email(command.email)
+
+        await self._validar_conflitos_email(email_limpo, cliente_id, cliente.email, cliente.usuario_id)
+        await self._validar_conflito_documento(command.cpf_cnpj, cliente.cpf_cnpj, cliente_id)
+
+        usuario = await self._buscar_usuario_associado(cliente.usuario_id)
+
+        self._aplicar_atualizacoes(cliente, usuario, command, email_limpo)
+
+        cliente_salvo = await self.repository.salvar(cliente)
+        return ClienteEditadoResponse.model_validate(cliente_salvo)
+
+    async def _buscar_cliente_ou_404(self, cliente_id: UUID) -> Cliente:
         cliente = await self.repository.buscar_por_id(cliente_id)
         if not cliente:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado."
             )
+        return cliente
 
-        # 1. Higieniza e valida o e-mail utilizando o Value Object (se fornecido no payload)
-        email_limpo = None
-        if command.email is not None:
-            try:
-                email_limpo = Email(command.email).valor
-            except ValueError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"E-mail inválido: {str(exc)}",
-                )
-
-        # 2. Valida e-mail duplicado em Clientes e Usuários (usando o valor higienizado!)
-        if email_limpo is not None and email_limpo != cliente.email:
-            # Busca conflito em Clientes
-            query_cli_email = select(Cliente).where(
-                Cliente.email == email_limpo, Cliente.id != cliente_id
+    def _higienizar_e_validar_email(self, email_raw: str | None) -> str | None:
+        if email_raw is None:
+            return None
+        try:
+            return Email(email_raw).valor
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"E-mail inválido: {str(exc)}",
             )
-            res_cli_email = await self.repository.db.execute(query_cli_email)
-            if res_cli_email.scalars().first():
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="O e-mail informado já está em uso por outro cliente.",
-                )
 
-            # Busca conflito em Usuários de autenticação
-            query_usr_email = select(Usuario).where(
-                Usuario.email == email_limpo, Usuario.id != cliente.usuario_id
+    async def _validar_conflitos_email(
+        self, email_limpo: str | None, cliente_id: UUID, email_atual: str, usuario_id: UUID
+    ):
+        if email_limpo is None or email_limpo == email_atual:
+            return
+
+        # Verifica conflito em Clientes
+        query_cli = select(Cliente).where(Cliente.email == email_limpo, Cliente.id != cliente_id)
+        res_cli = await self.repository.db.execute(query_cli)
+        if res_cli.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="O e-mail informado já está em uso por outro cliente.",
             )
-            res_usr_email = await self.repository.db.execute(query_usr_email)
-            if res_usr_email.scalars().first():
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="O e-mail informado já está em uso por outro usuário.",
-                )
 
-        # Valida CPF/CNPJ duplicado
-        if command.cpf_cnpj and command.cpf_cnpj != cliente.cpf_cnpj:
-            cliente_existente = await self.repository.buscar_por_cpf_cnpj(
-                command.cpf_cnpj
+        # Verifica conflito em Usuários
+        query_usr = select(Usuario).where(Usuario.email == email_limpo, Usuario.id != usuario_id)
+        res_usr = await self.repository.db.execute(query_usr)
+        if res_usr.scalars().first():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="O e-mail informado já está em uso por outro usuário.",
             )
-            if cliente_existente and cliente_existente.id != cliente_id:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Já existe um cliente cadastrado com o documento informado.",
-                )
 
-        # 3. Busca o Usuário associado para sincronização de login
-        query_usuario = select(Usuario).where(Usuario.id == cliente.usuario_id)
-        res_usuario = await self.repository.db.execute(query_usuario)
-        usuario = res_usuario.scalar_one_or_none()
+    async def _validar_conflito_documento(self, cpf_cnpj_novo: str | None, cpf_cnpj_atual: str, cliente_id: UUID):
+        if not cpf_cnpj_novo or cpf_cnpj_novo == cpf_cnpj_atual:
+            return
 
-        # 4. Atualização parcial e sincronização
+        cliente_existente = await self.repository.buscar_por_cpf_cnpj(cpf_cnpj_novo)
+        if cliente_existente and cliente_existente.id != cliente_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Já existe um cliente cadastrado com o documento informado.",
+            )
+
+    async def _buscar_usuario_associado(self, usuario_id: UUID) -> Usuario | None:
+        query = select(Usuario).where(Usuario.id == usuario_id)
+        result = await self.repository.db.execute(query)
+        return result.scalar_one_or_none()
+
+    def _aplicar_atualizacoes(
+        self, cliente: Cliente, usuario: Usuario | None, command: EditarClienteRequest, email_limpo: str | None
+    ):
         if command.nome is not None:
             cliente.nome = command.nome
             if usuario:
@@ -106,8 +117,3 @@ class EditarClienteHandler:
 
         if command.tipo_pessoa is not None:
             cliente.tipo_pessoa = command.tipo_pessoa
-
-        # 5. Salva delegando as transações ao repositório unificado
-        cliente_salvo = await self.repository.salvar(cliente)
-
-        return ClienteEditadoResponse.model_validate(cliente_salvo)
