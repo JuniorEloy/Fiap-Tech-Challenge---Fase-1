@@ -28,5 +28,12 @@ class ServicoBase(Base):
     )
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    permite_servico_expresso: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="Flag indicando se este serviço é expresso e pula a etapa de diagnóstico físico pelo mecânico"
+    )
+
     def __repr__(self) -> str:
         return f"<ServicoBase {self.nome} - R$ {self.preco_mao_de_obra} - {self.duracao_estimada_minutos} min>"
