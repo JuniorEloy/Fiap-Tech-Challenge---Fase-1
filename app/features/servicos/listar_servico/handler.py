@@ -1,6 +1,6 @@
 from typing import Optional, List
 from app.features.servicos.repository import ServicosRepository
-from app.features.servicos.cadastrar_servico.schemas import ServicoResponse
+from app.features.servicos.listar_servico.schemas import ServicoResponse
 
 
 class ListarServicosHandler:
