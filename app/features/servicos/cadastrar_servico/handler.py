@@ -32,6 +32,7 @@ class CadastrarServicoHandler:
             descricao=command.descricao,
             preco_mao_de_obra=command.preco_mao_de_obra,
             duracao_estimada_minutos=command.duracao_estimada_minutos,
+            permite_servico_expresso=command.permite_servico_expresso,
             ativo=True,
         )
 

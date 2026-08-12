@@ -47,6 +47,8 @@ class EditarServicoHandler:
             servico.duracao_estimada_minutos = command.duracao_estimada_minutos
         if command.ativo is not None:
             servico.ativo = command.ativo
+        if command.permite_servico_expresso is not None:
+            servico.permite_servico_expresso = command.permite_servico_expresso
 
         # 4. Grava transacionalmente as alterações
         servico_atualizado = await self.repository.salvar(servico)

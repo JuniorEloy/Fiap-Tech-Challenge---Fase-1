@@ -2,6 +2,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.ordens_servico.models import OrdemServico, OrdemServicoStatusLog
+from sqlalchemy.orm import selectinload
 
 
 class OrdemServicoRepository:
@@ -9,9 +10,14 @@ class OrdemServicoRepository:
         self.db = db
 
     async def buscar_por_id(self, os_id: UUID) -> OrdemServico | None:
-        """Busca a OS carregando eager-loaded relacionamentos de itens."""
+        """Busca a OS carregando previamente (eager-loading) os relacionamentos de itens."""
         result = await self.db.execute(
-            select(OrdemServico).where(OrdemServico.id == os_id)
+            select(OrdemServico)
+            .where(OrdemServico.id == os_id)
+            .options(
+                selectinload(OrdemServico.itens_servico),
+                selectinload(OrdemServico.itens_peca),
+            )
         )
         return result.scalar_one_or_none()
 

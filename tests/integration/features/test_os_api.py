@@ -11,13 +11,14 @@ import string
 # Utiliza as fixtures oficiais configuradas em seu conftest.py para simular
 # autenticação real de cada papel do sistema.
 
+
 def gerar_placa_valida_para_teste() -> str:
     """Gera uma placa Mercosul válida e aleatória (formato AAA9A99) para evitar colisões."""
     leiras_aleatorias_1 = "".join(random.choices(string.ascii_uppercase, k=3))
     numero_1 = str(random.randint(0, 9))
     letra_aleatoria_2 = random.choice(string.ascii_uppercase)
     numeros_finais = "".join(random.choices(string.digits, k=2))
-    
+
     return f"{leiras_aleatorias_1}{numero_1}{letra_aleatoria_2}{numeros_finais}"
 
 
@@ -38,7 +39,6 @@ async def test_recepcionista_deve_abrir_os_com_sucesso_em_diagnostico_quando_nao
         "senha": "senhaSegura123",
         "role": "RECEPCIONISTA",
     }
-    # (Opcional: se a rota de cadastro for pública ou se você usar um token de admin/master para criá-lo)
     await async_client.post("/usuarios", json=payload_usuario, headers=headers)
 
     # 1. Cadastramos um cliente de teste com CPF matematicamente válido
@@ -86,7 +86,6 @@ async def test_recepcionista_deve_abrir_os_com_sucesso_em_diagnostico_quando_nao
     assert "id" in body
     assert body["cliente_id"] == cliente_id
     assert body["veiculo_id"] == veiculo_id
-    # Sem serviços expressos, a OS obrigatoriamente cai na esteira de Diagnóstico
     assert body["status"] == "EM_DIAGNOSTICO"
     assert body["visualizacao_hash"] is not None
 
@@ -101,12 +100,11 @@ async def test_gerente_deve_conseguir_abrir_os(
     """
     headers = {"Authorization": f"Bearer {token_gerente}"}
 
-    # Cadastra o cliente e veículo
     payload_cliente = {
         "nome": "Marcos Gerência",
         "email": "marcos.gerencia@oficina.com",
         "telefone": "11955556666",
-        "cpf_cnpj": "96292365085",  # 🌟 CPF Matemático Válido para passar no Value Object (CpfCnpj)
+        "cpf_cnpj": "96292365085",
         "tipo_pessoa": "FISICA",
     }
     res_cliente = await async_client.post(
@@ -146,22 +144,16 @@ async def test_gerente_deve_conseguir_abrir_os(
 async def test_mecanico_nao_deve_conseguir_abrir_os(
     async_client: AsyncClient, token_mecanico: str
 ):
-    """
-    Cenário: Mecânico tenta abrir uma OS (violação de papéis e barreira de segurança RBAC).
-    Resultado esperado: 403 Forbidden.
-    """
+    """Cenário: Mecânico tenta abrir uma OS (violação de papéis). Resultado: 403 Forbidden."""
     headers = {"Authorization": f"Bearer {token_mecanico}"}
     payload_os = {
         "cliente_id": str(uuid7()),
         "veiculo_id": str(uuid7()),
         "servicos": [],
     }
-
     response = await async_client.post(
         "/ordens-servico", json=payload_os, headers=headers
     )
-
-    # 🛡️ O RBAC na borda do FastAPI deve rejeitar o acesso!
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
@@ -169,17 +161,13 @@ async def test_mecanico_nao_deve_conseguir_abrir_os(
 async def test_estoquista_nao_deve_conseguir_abrir_os(
     async_client: AsyncClient, token_estoquista: str
 ):
-    """
-    Cenário: Estoquista tenta criar uma OS (violação de papel).
-    Resultado esperado: 403 Forbidden.
-    """
+    """Cenário: Estoquista tenta criar uma OS (violação de papel). Resultado: 403 Forbidden."""
     headers = {"Authorization": f"Bearer {token_estoquista}"}
     payload_os = {
         "cliente_id": str(uuid7()),
         "veiculo_id": str(uuid7()),
         "servicos": [],
     }
-
     response = await async_client.post(
         "/ordens-servico", json=payload_os, headers=headers
     )
@@ -188,27 +176,21 @@ async def test_estoquista_nao_deve_conseguir_abrir_os(
 
 @pytest.mark.asyncio
 async def test_usuario_nao_autenticado_deve_receber_401(async_client: AsyncClient):
-    """
-    Cenário: Chamada de abertura de OS sem apresentar cabeçalho de autenticação Bearer.
-    Resultado esperado: 401 Unauthorized.
-    """
+    """Cenário: Chamada sem token. Resultado: 401 Unauthorized."""
     payload_os = {
         "cliente_id": str(uuid7()),
         "veiculo_id": str(uuid7()),
         "servicos": [],
     }
-
     response = await async_client.post("/ordens-servico", json=payload_os)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
 
 @pytest.mark.asyncio
 async def test_falha_cliente_nao_encontrado_ao_abrir_os(
     async_client: AsyncClient, token_recepcionista: str
 ):
-    """
-    Cenário: Tentativa de abrir OS com ID de cliente inexistente.
-    Resultado esperado: 404 Not Found.
-    """
+    """Cenário: Tentativa de abrir OS com ID de cliente inexistente. Resultado: 404 Not Found."""
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
     payload_os = {
         "cliente_id": str(uuid7()),
@@ -226,10 +208,7 @@ async def test_falha_cliente_nao_encontrado_ao_abrir_os(
 async def test_falha_veiculo_nao_encontrado_ao_abrir_os(
     async_client: AsyncClient, token_recepcionista: str
 ):
-    """
-    Cenário: Tentativa de abrir OS com cliente válido, mas veículo inexistente.
-    Resultado esperado: 404 Not Found.
-    """
+    """Cenário: Tentativa de abrir OS com cliente válido, mas veículo inexistente. Resultado: 404 Not Found."""
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
 
     uid = str(uuid7())[:6]
@@ -237,10 +216,12 @@ async def test_falha_veiculo_nao_encontrado_ao_abrir_os(
         "nome": "Cliente Sem Carro",
         "email": f"sem.carro.{uid}@oficina.com",
         "telefone": "11944443333",
-        "cpf_cnpj": "52889394034",  # CPF Válido
+        "cpf_cnpj": "52889394034",
         "tipo_pessoa": "FISICA",
     }
-    res_cli = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    res_cli = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
     assert res_cli.status_code == status.HTTP_201_CREATED
     cliente_id = res_cli.json()["id"]
 
@@ -260,17 +241,13 @@ async def test_falha_veiculo_nao_encontrado_ao_abrir_os(
 async def test_falha_servico_inexistente_no_catalogo(
     async_client: AsyncClient, token_recepcionista: str
 ):
-    """
-    Cenário: Tentativa de abrir OS informando um serviço que não existe no catálogo.
-    Resultado esperado: 400 Bad Request.
-    """
+    """Cenário: Tentativa de abrir OS informando um serviço que não existe. Resultado: 400 Bad Request."""
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
 
     uid = str(uuid7())[:6]
-    cpf_valido = CPF().generate()  # 🌟 Perfeito! Usando a biblioteca documentada
-    placa_valida = gerar_placa_valida_para_teste()  # 🌟 Placa Mercosul válida gerada dinamicamente
-    
-    # 1. Cadastra o cliente com CPF válido da biblioteca
+    cpf_valido = CPF().generate()
+    placa_valida = gerar_placa_valida_para_teste()
+
     payload_cliente = {
         "nome": "Cliente Catálogo",
         "email": f"catalogo.{uid}@oficina.com",
@@ -278,13 +255,14 @@ async def test_falha_servico_inexistente_no_catalogo(
         "cpf_cnpj": cpf_valido,
         "tipo_pessoa": "FISICA",
     }
-    res_cli = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    res_cli = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
     assert res_cli.status_code == status.HTTP_201_CREATED
     cliente_id = res_cli.json()["id"]
 
-    # 2. Cadastra o veículo com placa Mercosul válida e sem colisão de banco
     payload_vei = {
-        "placa": placa_valida,  
+        "placa": placa_valida,
         "marca": "Fiat",
         "modelo": "Palio",
         "ano": 2010,
@@ -294,17 +272,236 @@ async def test_falha_servico_inexistente_no_catalogo(
     assert res_vei.status_code == status.HTTP_201_CREATED
     veiculo_id = res_vei.json()["id"]
 
-    # 3. Tenta abrir a OS enviando um ID de serviço inexistente
     payload_os = {
         "cliente_id": cliente_id,
         "veiculo_id": veiculo_id,
-        "servicos_solicitados": [{"servico_id": str(uuid7())}],  
-        "pecas_solicitadas": [],                                 
+        "servicos_solicitados": [{"servico_id": str(uuid7())}],
+        "pecas_solicitadas": [],
     }
 
     response = await async_client.post(
         "/ordens-servico", json=payload_os, headers=headers
     )
-    
-    # 4. Agora a barreira de validação cadastral passa lisa e bate no erro de negócio do catálogo
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+# ==========================================
+# NOVOS TESTES PARA COBRIR O FLUXO EXPRESSO (100%)
+# ==========================================
+
+
+@pytest.mark.asyncio
+async def test_recepcionista_deve_abrir_os_em_diagnostico_quando_servico_nao_permite_expresso(
+    async_client: AsyncClient, token_recepcionista: str, token_gerente: str
+):
+    """
+    Cenário: Serviços informados mas sem permissão de expresso (permite_servico_expresso = False).
+    Resultado esperado: 201 Created com status EM_DIAGNOSTICO.
+    """
+    headers_rec = {"Authorization": f"Bearer {token_recepcionista}"}
+    headers_ger = {"Authorization": f"Bearer {token_gerente}"}
+    uid = str(uuid7())[:6]
+
+    # 1. Gerente cadastra serviço que NÃO permite expresso
+    payload_servico = {
+        "nome": f"Retifica de Motor {uid}",
+        "descricao": "Serviço complexo de motor",
+        "preco_mao_de_obra": 1500.00,
+        "duracao_estimada_minutos": 480,
+        "permite_servico_expresso": False,
+    }
+    res_serv = await async_client.post(
+        "/servicos", json=payload_servico, headers=headers_ger
+    )
+    assert res_serv.status_code == status.HTTP_201_CREATED
+    servico_id = res_serv.json()["id"]
+
+    # 2. Cadastra cliente e veículo
+    res_cli = await async_client.post(
+        "/clientes",
+        json={
+            "nome": "Cliente Motor",
+            "email": f"motor.{uid}@oficina.com",
+            "telefone": "11911112222",
+            "cpf_cnpj": CPF().generate(),
+            "tipo_pessoa": "FISICA",
+        },
+        headers=headers_rec,
+    )
+    cliente_id = res_cli.json()["id"]
+
+    res_vei = await async_client.post(
+        "/veiculos",
+        json={
+            "placa": gerar_placa_valida_para_teste(),
+            "marca": "VW",
+            "modelo": "Gol",
+            "ano": 2018,
+            "cliente_id": cliente_id,
+        },
+        headers=headers_rec,
+    )
+    veiculo_id = res_vei.json()["id"]
+
+    # 3. Abre OS solicitando o serviço não expresso
+    payload_os = {
+        "cliente_id": cliente_id,
+        "veiculo_id": veiculo_id,
+        "servicos_solicitados": [{"servico_id": servico_id}],
+        "pecas_solicitadas": [],
+    }
+    response = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers_rec
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.json()["status"] == "EM_DIAGNOSTICO"
+
+
+@pytest.mark.asyncio
+async def test_recepcionista_deve_abrir_os_com_sucesso_em_fluxo_expresso(
+    async_client: AsyncClient, token_recepcionista: str, token_gerente: str
+):
+    """
+    Cenário: Serviços com permissão de expresso e peças válidas no estoque.
+    Resultado esperado: 201 Created com transição automática para AGUARDANDO_APROVACAO.
+    """
+    headers_rec = {"Authorization": f"Bearer {token_recepcionista}"}
+    headers_ger = {"Authorization": f"Bearer {token_gerente}"}
+    uid = str(uuid7())[:6]
+
+    # 1. Gerente cadastra serviço expresso
+    res_serv = await async_client.post(
+        "/servicos",
+        json={
+            "nome": f"Alinhamento Rápido {uid}",
+            "descricao": "Alinhamento e balanceamento",
+            "preco_mao_de_obra": 120.00,
+            "duracao_estimada_minutos": 40,
+            "permite_servico_expresso": True,
+        },
+        headers=headers_ger,
+    )
+    servico_id = res_serv.json()["id"]
+
+    # 2. Gerente cadastra peça no estoque (Rota e Payload Corrigidos)
+    res_peca = await async_client.post(
+        "/estoque",
+        json={
+            "nome": f"Chumbo de Roda {uid}",
+            "descricao": "Chumbo para balanceamento de rodas",
+            "preco_custo": 5.00,
+            "preco_venda": 15.00,
+            "quantidade_inicial": 50,
+            "limite_minimo": 10,
+        },
+        headers=headers_ger,
+    )
+
+    # 3. Cadastra cliente e veículo
+    res_cli = await async_client.post(
+        "/clientes",
+        json={
+            "nome": "Cliente Expresso",
+            "email": f"expresso.{uid}@oficina.com",
+            "telefone": "11922223333",
+            "cpf_cnpj": CPF().generate(),
+            "tipo_pessoa": "FISICA",
+        },
+        headers=headers_rec,
+    )
+    cliente_id = res_cli.json()["id"]
+
+    res_vei = await async_client.post(
+        "/veiculos",
+        json={
+            "placa": gerar_placa_valida_para_teste(),
+            "marca": "Honda",
+            "modelo": "Civic",
+            "ano": 2020,
+            "cliente_id": cliente_id,
+        },
+        headers=headers_rec,
+    )
+    veiculo_id = res_vei.json()["id"]
+
+    assert res_peca.status_code == status.HTTP_201_CREATED
+    peca_id = res_peca.json()["id"]
+
+    # 4. Abre OS com serviço expresso e peça alocada
+    payload_os = {
+        "cliente_id": cliente_id,
+        "veiculo_id": veiculo_id,
+        "servicos_solicitados": [{"servico_id": servico_id}],
+        "pecas_solicitadas": [{"peca_id": peca_id, "quantidade": 2}],
+    }
+    response = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers_rec
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert response.json()["status"] == "AGUARDANDO_APROVACAO"
+
+
+@pytest.mark.asyncio
+async def test_falha_peca_inexistente_no_estoque_ao_abrir_os(
+    async_client: AsyncClient, token_recepcionista: str, token_gerente: str
+):
+    """
+    Cenário: Serviço expresso válido, mas informando peça com ID inexistente no estoque.
+    Resultado esperado: 400 Bad Request.
+    """
+    headers_rec = {"Authorization": f"Bearer {token_recepcionista}"}
+    headers_ger = {"Authorization": f"Bearer {token_gerente}"}
+    uid = str(uuid7())[:6]
+
+    res_serv = await async_client.post(
+        "/servicos",
+        json={
+            "nome": f"Revisão Básica {uid}",
+            "descricao": "Revisão de 10k km",
+            "preco_mao_de_obra": 200.00,
+            "duracao_estimada_minutos": 60,
+            "permite_servico_expresso": True,
+        },
+        headers=headers_ger,
+    )
+    servico_id = res_serv.json()["id"]
+
+    res_cli = await async_client.post(
+        "/clientes",
+        json={
+            "nome": "Cliente Peça Errada",
+            "email": f"peca.errada.{uid}@oficina.com",
+            "telefone": "11933334444",
+            "cpf_cnpj": CPF().generate(),
+            "tipo_pessoa": "FISICA",
+        },
+        headers=headers_rec,
+    )
+    cliente_id = res_cli.json()["id"]
+
+    res_vei = await async_client.post(
+        "/veiculos",
+        json={
+            "placa": gerar_placa_valida_para_teste(),
+            "marca": "Hyundai",
+            "modelo": "HB20",
+            "ano": 2021,
+            "cliente_id": cliente_id,
+        },
+        headers=headers_rec,
+    )
+    veiculo_id = res_vei.json()["id"]
+
+    payload_os = {
+        "cliente_id": cliente_id,
+        "veiculo_id": veiculo_id,
+        "servicos_solicitados": [{"servico_id": servico_id}],
+        "pecas_solicitadas": [{"peca_id": str(uuid7()), "quantidade": 1}],  # Peça fake
+    }
+    response = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers_rec
+    )
+
     assert response.status_code == status.HTTP_400_BAD_REQUEST

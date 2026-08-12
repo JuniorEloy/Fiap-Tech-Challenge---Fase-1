@@ -2,47 +2,87 @@ from typing import Optional, List
 from uuid import UUID
 from decimal import Decimal
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import (
+    BaseModel,
+    Field,
+    ConfigDict,
+    AliasPath,
+)
+
 from app.features.ordens_servico.models import StatusOS
 
 
 class ItemServicoRequest(BaseModel):
-    """Schema: Identificador do serviço solicitado na abertura (Check-in)."""
+    """Serviço solicitado na abertura da OS."""
 
     servico_id: UUID = Field(
-        ..., description="ID do serviço do catálogo (ex: Troca de Óleo)"
+        ...,
+        description="ID do serviço do catálogo",
     )
 
 
 class ItemPecaRequest(BaseModel):
-    """Schema: Peça e quantidade solicitadas previamente (ex: Filtro de óleo)."""
+    """Peça e quantidade solicitadas na abertura da OS."""
 
-    peca_id: UUID = Field(..., description="ID da peça do estoque")
-    quantidade: int = Field(..., gt=0, description="Quantidade demandada")
+    peca_id: UUID = Field(
+        ...,
+        description="ID da peça do estoque",
+    )
+
+    quantidade: int = Field(
+        ...,
+        gt=0,
+        description="Quantidade demandada",
+    )
 
 
 class CriarOrdemServicoRequest(BaseModel):
-    """Schema de Entrada: Dados necessários para realizar o Check-in do veículo."""
+    """Dados necessários para realizar o Check-in."""
 
-    cliente_id: UUID = Field(..., description="ID do cliente (usuário cadastrado)")
-    veiculo_id: UUID = Field(..., description="ID do veículo associado")
+    cliente_id: UUID = Field(
+        ...,
+        description="ID do cliente",
+    )
 
-    # Listas opcionais para o caso de Serviço Expresso
+    veiculo_id: UUID = Field(
+        ...,
+        description="ID do veículo",
+    )
+
     servicos_solicitados: List[ItemServicoRequest] = Field(
         default_factory=list,
-        description="Lista de serviços conhecidos solicitados no check-in (ex: revisão simples)",
+        description="Serviços solicitados no check-in",
     )
+
     pecas_solicitadas: List[ItemPecaRequest] = Field(
         default_factory=list,
-        description="Lista de peças que se sabe previamente que serão consumidas",
+        description="Peças previamente solicitadas",
     )
 
 
 class ItemServicoResponse(BaseModel):
-    """Schema de Saída: Confirmação do serviço atrelado."""
+    """
+    Representação do serviço efetivamente anexado à OS.
 
-    servico_id: UUID
-    nome: str
+    ORM:
+        ItemServicoOS.servico_base_id
+        ItemServicoOS.servico_base.nome
+
+    API:
+        servico_id
+        nome
+    """
+
+    servico_id: UUID = Field(validation_alias=AliasPath("servico_base_id"))
+
+    nome: str = Field(
+        validation_alias=AliasPath(
+            "servico_base",
+            "nome",
+        )
+    )
+
     preco_aplicado: Decimal
     duracao_minutos: int
 
@@ -50,36 +90,55 @@ class ItemServicoResponse(BaseModel):
 
 
 class ItemPecaResponse(BaseModel):
+    """
+    Representação da peça efetivamente anexada à OS.
+
+    ORM:
+        ItemPecaOS.peca_id
+        ItemPecaOS.peca.nome
+
+    API:
+        peca_id
+        nome_peca
+    """
+
     peca_id: UUID
+
     quantidade: int
+
     preco_unitario_aplicado: Decimal
 
-    nome_peca: str
-
-    @classmethod
-    def model_validate(cls, obj):
-        return cls(
-            peca_id=obj.peca_id,
-            quantidade=obj.quantidade,
-            preco_unitario_aplicado=obj.preco_unitario_aplicado,
-            nome_peca=obj.peca.nome,
+    nome_peca: str = Field(
+        validation_alias=AliasPath(
+            "peca",
+            "nome",
         )
+    )
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OrdemServicoResponse(BaseModel):
-    """Schema de Saída: Resposta detalhada da OS recém-criada (ou atualizada)."""
+    """Resposta detalhada da OS."""
 
     id: UUID
+
     cliente_id: UUID
+
     veiculo_id: UUID
+
     mecanico_id: Optional[UUID] = None
+
     status: StatusOS
+
     visualizacao_hash: UUID
+
     data_abertura: datetime
+
     data_conclusao: Optional[datetime] = None
 
-    # Itens anexados
-    itens_servico: List[ItemServicoResponse]
-    itens_peca: List[ItemPecaResponse]
+    itens_servico: List[ItemServicoResponse] = Field(default_factory=list)
+
+    itens_peca: List[ItemPecaResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

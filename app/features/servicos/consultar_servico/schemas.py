@@ -13,5 +13,6 @@ class ServicoResponse(BaseModel):
     preco_mao_de_obra: Decimal
     duracao_estimada_minutos: int
     ativo: bool
+    permite_servico_expresso: bool
 
     model_config = ConfigDict(from_attributes=True)

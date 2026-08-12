@@ -19,6 +19,10 @@ class CadastrarServicoRequest(BaseModel):
     duracao_estimada_minutos: int = Field(
         30, gt=0, description="Duração estimada de execução em minutos"
     )
+    permite_servico_expresso: bool = Field(
+        False,
+        description="Flag indicando se este serviço é expresso e pula diagnóstico físico",
+    )
 
     @field_validator("preco_mao_de_obra")
     @classmethod
@@ -36,9 +40,10 @@ class ServicoResponse(BaseModel):
 
     id: UUID
     nome: str
-    descricao: Optional[str] = None  # 🌟 Explícito default value para SonarQube!
+    descricao: Optional[str] = None
     preco_mao_de_obra: Decimal
     duracao_estimada_minutos: int
     ativo: bool
+    permite_servico_expresso: bool
 
     model_config = ConfigDict(from_attributes=True)

@@ -21,6 +21,10 @@ class EditarServicoRequest(BaseModel):
     ativo: Optional[bool] = Field(
         None, description="Status de ativação cadastral do serviço"
     )
+    permite_servico_expresso: Optional[bool] = Field(
+        None,
+        description="Indica se este serviço é rápido e pode pular a etapa de diagnóstico mecânico",
+    )
 
     @field_validator("preco_mao_de_obra")
     @classmethod
