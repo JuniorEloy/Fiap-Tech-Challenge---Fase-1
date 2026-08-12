@@ -23,6 +23,7 @@ from app.features.servicos.models import ServicoBase
 from app.features.estoque.models import PecaInsumo
 from app.features.clientes.models import Cliente
 
+
 class CriarOrdemServicoHandler:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -35,15 +36,17 @@ class CriarOrdemServicoHandler:
         Orquestra a criação de uma nova Ordem de Serviço (Check-in) e valida o fluxo expresso.
         """
         # 1. Valida se o Cliente existe e está ativo
-        res_cli = await self.db.execute(select(Cliente).where(Cliente.id == command.cliente_id))
+        res_cli = await self.db.execute(
+            select(Cliente).where(Cliente.id == command.cliente_id)
+        )
         cliente = res_cli.scalar_one_or_none()
-        
+
         # Checa de forma resiliente o campo 'ativo' (caso exista ou não no modelo Cliente)
         cliente_ativo = getattr(cliente, "ativo", True)
         if not cliente or not cliente_ativo:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Cliente associado não encontrado ou inativo no sistema."
+                detail="Cliente associado não encontrado ou inativo no sistema.",
             )
 
         # 2. Valida se o Veículo existe
@@ -143,6 +146,8 @@ class CriarOrdemServicoHandler:
         # 6. Salva as alterações na transação do banco
         await self.db.commit()
 
-        await self.db.refresh(os, attribute_names=["itens_servico", "itens_peca", "logs_status"])
+        await self.db.refresh(
+            os, attribute_names=["itens_servico", "itens_peca", "logs_status"]
+        )
 
         return OrdemServicoResponse.model_validate(os)

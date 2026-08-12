@@ -8,6 +8,7 @@ from uuid import uuid7
 # Utiliza as fixtures oficiais configuradas em seu conftest.py para simular
 # autenticação real de cada papel do sistema.
 
+
 @pytest.mark.asyncio
 async def test_recepcionista_deve_abrir_os_com_sucesso_em_diagnostico_quando_nao_houver_servicos(
     async_client: AsyncClient, token_recepcionista: str
@@ -23,7 +24,7 @@ async def test_recepcionista_deve_abrir_os_com_sucesso_em_diagnostico_quando_nao
         "nome": "Recepcionista Teste",
         "email": "recepcao.teste@oficina.com",
         "senha": "senhaSegura123",
-        "role": "RECEPCIONISTA"
+        "role": "RECEPCIONISTA",
     }
     # (Opcional: se a rota de cadastro for pública ou se você usar um token de admin/master para criá-lo)
     await async_client.post("/usuarios", json=payload_usuario, headers=headers)
@@ -33,10 +34,12 @@ async def test_recepcionista_deve_abrir_os_com_sucesso_em_diagnostico_quando_nao
         "nome": "João das Ordens",
         "email": "joao.os@oficina.com",
         "telefone": "11977778888",
-        "cpf_cnpj": "32105222862",  
+        "cpf_cnpj": "32105222862",
         "tipo_pessoa": "FISICA",
     }
-    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    res_cliente = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
     assert res_cliente.status_code == status.HTTP_201_CREATED
     cliente_id = res_cliente.json()["id"]
 
@@ -48,7 +51,9 @@ async def test_recepcionista_deve_abrir_os_com_sucesso_em_diagnostico_quando_nao
         "ano": 2022,
         "cliente_id": cliente_id,
     }
-    res_veiculo = await async_client.post("/veiculos", json=payload_veiculo, headers=headers)
+    res_veiculo = await async_client.post(
+        "/veiculos", json=payload_veiculo, headers=headers
+    )
     assert res_veiculo.status_code == status.HTTP_201_CREATED
     veiculo_id = res_veiculo.json()["id"]
 
@@ -57,11 +62,13 @@ async def test_recepcionista_deve_abrir_os_com_sucesso_em_diagnostico_quando_nao
         "cliente_id": cliente_id,
         "veiculo_id": veiculo_id,
         "servicos": [],
-        "pecas": []
+        "pecas": [],
     }
-    
-    response = await async_client.post("/ordens-servico", json=payload_os, headers=headers)
-   
+
+    response = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers
+    )
+
     assert response.status_code == status.HTTP_201_CREATED
     body = response.json()
     assert "id" in body
@@ -90,7 +97,9 @@ async def test_gerente_deve_conseguir_abrir_os(
         "cpf_cnpj": "96292365085",  # 🌟 CPF Matemático Válido para passar no Value Object (CpfCnpj)
         "tipo_pessoa": "FISICA",
     }
-    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    res_cliente = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
     assert res_cliente.status_code == status.HTTP_201_CREATED
     cliente_id = res_cliente.json()["id"]
 
@@ -101,7 +110,9 @@ async def test_gerente_deve_conseguir_abrir_os(
         "ano": 2021,
         "cliente_id": cliente_id,
     }
-    res_veiculo = await async_client.post("/veiculos", json=payload_veiculo, headers=headers)
+    res_veiculo = await async_client.post(
+        "/veiculos", json=payload_veiculo, headers=headers
+    )
     assert res_veiculo.status_code == status.HTTP_201_CREATED
     veiculo_id = res_veiculo.json()["id"]
 
@@ -109,10 +120,12 @@ async def test_gerente_deve_conseguir_abrir_os(
         "cliente_id": cliente_id,
         "veiculo_id": veiculo_id,
         "servicos": [],
-        "pecas": []
+        "pecas": [],
     }
 
-    response = await async_client.post("/ordens-servico", json=payload_os, headers=headers)
+    response = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers
+    )
     assert response.status_code == status.HTTP_201_CREATED
     assert response.json()["status"] == "EM_DIAGNOSTICO"
 
@@ -129,11 +142,13 @@ async def test_mecanico_nao_deve_conseguir_abrir_os(
     payload_os = {
         "cliente_id": str(uuid7()),
         "veiculo_id": str(uuid7()),
-        "servicos": []
+        "servicos": [],
     }
 
-    response = await async_client.post("/ordens-servico", json=payload_os, headers=headers)
-    
+    response = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers
+    )
+
     # 🛡️ O RBAC na borda do FastAPI deve rejeitar o acesso!
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
@@ -150,17 +165,17 @@ async def test_estoquista_nao_deve_conseguir_abrir_os(
     payload_os = {
         "cliente_id": str(uuid7()),
         "veiculo_id": str(uuid7()),
-        "servicos": []
+        "servicos": [],
     }
 
-    response = await async_client.post("/ordens-servico", json=payload_os, headers=headers)
+    response = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers
+    )
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.asyncio
-async def test_usuario_nao_autenticado_deve_receber_401(
-    async_client: AsyncClient
-):
+async def test_usuario_nao_autenticado_deve_receber_401(async_client: AsyncClient):
     """
     Cenário: Chamada de abertura de OS sem apresentar cabeçalho de autenticação Bearer.
     Resultado esperado: 401 Unauthorized.
@@ -168,7 +183,7 @@ async def test_usuario_nao_autenticado_deve_receber_401(
     payload_os = {
         "cliente_id": str(uuid7()),
         "veiculo_id": str(uuid7()),
-        "servicos": []
+        "servicos": [],
     }
 
     response = await async_client.post("/ordens-servico", json=payload_os)

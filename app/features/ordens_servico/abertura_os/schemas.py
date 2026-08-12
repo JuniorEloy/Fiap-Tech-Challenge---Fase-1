@@ -50,13 +50,20 @@ class ItemServicoResponse(BaseModel):
 
 
 class ItemPecaResponse(BaseModel):
-    """Schema de Saída: Confirmação do insumo atrelado."""
-
     peca_id: UUID
     quantidade: int
     preco_unitario_aplicado: Decimal
 
-    model_config = ConfigDict(from_attributes=True)
+    nome_peca: str
+
+    @classmethod
+    def model_validate(cls, obj):
+        return cls(
+            peca_id=obj.peca_id,
+            quantidade=obj.quantidade,
+            preco_unitario_aplicado=obj.preco_unitario_aplicado,
+            nome_peca=obj.peca.nome,
+        )
 
 
 class OrdemServicoResponse(BaseModel):

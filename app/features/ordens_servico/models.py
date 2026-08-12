@@ -96,7 +96,7 @@ class OrdemServico(Base):
     # 🔒 Prevenção de IDOR: Chave secundária criptográfica e opaca gerada no check-in
     visualizacao_hash: Mapped[UUID] = mapped_column(
         nullable=False,
-        default=uuid7,  
+        default=uuid7,
         unique=True,
         comment="Hash criptográfico opaco utilizado para acompanhamento seguro pelo cliente sem expor o ID sequencial",
     )

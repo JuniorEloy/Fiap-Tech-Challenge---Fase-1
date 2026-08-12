@@ -1,9 +1,7 @@
 from fastapi import APIRouter
 
 
-from app.features.ordens_servico.abertura_os.router import (
-    router as criar_ordem_servico
-)
+from app.features.ordens_servico.abertura_os.router import router as criar_ordem_servico
 
 os_router = APIRouter()
 

@@ -6,6 +6,9 @@ from app.features.ordens_servico.models import (
     StatusOS,
     OrdemServicoStatusLog,
 )
+from app.shared.utils.clock import DateTimeProvider
+
+clock = DateTimeProvider()
 
 
 def test_deve_permitir_transicao_valida_de_status():
@@ -48,7 +51,7 @@ def test_deve_calcular_tempo_de_espera_do_cliente_ao_responder_orcamento():
     assert os.data_notificacao_cliente is not None
 
     # Mockando a data de notificação para 30 minutos no passado
-    os.data_notificacao_cliente = datetime.utcnow() - timedelta(minutes=30)
+    os.data_notificacao_cliente = clock.agora() - timedelta(minutes=30)
 
     # 2. Cliente aprova o orçamento e o status move para EM_EXECUCAO
     os.alterar_status(StatusOS.EM_EXECUCAO, operador_id)
@@ -58,7 +61,7 @@ def test_deve_calcular_tempo_de_espera_do_cliente_ao_responder_orcamento():
 
 
 def test_deve_calcular_lead_times_ao_finalizar_a_os():
-    abertura = datetime.utcnow() - timedelta(hours=10)  # Carro entrou há 10 horas
+    abertura = clock.agora() - timedelta(hours=10)  # Carro entrou há 10 horas
     os = OrdemServico(
         id=uuid7(),
         cliente_id=uuid7(),

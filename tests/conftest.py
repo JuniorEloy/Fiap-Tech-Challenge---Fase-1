@@ -204,10 +204,11 @@ from sqlalchemy import text
 # UUID fixo para o Gerente de testes (compartilhado e reutilizado instantaneamente)
 GERENTE_TESTE_ID = UUID("019ff420-0000-7000-8000-000000000001")
 
+
 @pytest.fixture
 async def token_gerente(db):
     """
-    Gera o token e garante que o usuário gerente fixo existe no banco 
+    Gera o token e garante que o usuário gerente fixo existe no banco
     de forma ultra-rápida, sem criar lixo ou lentidão.
     """
     usuario = await db.get(Usuario, GERENTE_TESTE_ID)
@@ -218,7 +219,7 @@ async def token_gerente(db):
             email="gerente.teste@oficina.com",
             senha="hash_falso_ou_valido",
             role=Role.GERENTE,
-            ativo=True
+            ativo=True,
         )
         db.add(usuario)
         await db.commit()
@@ -229,10 +230,11 @@ async def token_gerente(db):
 # UUID fixo para a Recepcionista de testes
 RECEPCIONISTA_TESTE_ID = UUID("019ff420-0000-7000-8000-000000000002")
 
+
 @pytest.fixture
 async def token_recepcionista(db):
     """
-    Gera o token e garante que o usuário recepcionista fixo existe no banco 
+    Gera o token e garante que o usuário recepcionista fixo existe no banco
     de forma ultra-rápida, sem criar lixo ou lentidão.
     """
     usuario = await db.get(Usuario, RECEPCIONISTA_TESTE_ID)
@@ -243,12 +245,14 @@ async def token_recepcionista(db):
             email="recepcao.teste@oficina.com",
             senha="hash_falso_ou_valido",
             role=Role.RECEPCIONISTA,
-            ativo=True
+            ativo=True,
         )
         db.add(usuario)
         await db.commit()
 
-    return criar_access_token(usuario_id=RECEPCIONISTA_TESTE_ID, role=Role.RECEPCIONISTA)
+    return criar_access_token(
+        usuario_id=RECEPCIONISTA_TESTE_ID, role=Role.RECEPCIONISTA
+    )
 
 
 @pytest.fixture
