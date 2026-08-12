@@ -3,10 +3,22 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 from uuid import uuid7
+from validate_docbr import CPF
+import random
+import string
 
 # 🌟 Testes de Integração de API com suporte completo a RBAC (Fase 1 - Etapa 2)
 # Utiliza as fixtures oficiais configuradas em seu conftest.py para simular
 # autenticação real de cada papel do sistema.
+
+def gerar_placa_valida_para_teste() -> str:
+    """Gera uma placa Mercosul válida e aleatória (formato AAA9A99) para evitar colisões."""
+    leiras_aleatorias_1 = "".join(random.choices(string.ascii_uppercase, k=3))
+    numero_1 = str(random.randint(0, 9))
+    letra_aleatoria_2 = random.choice(string.ascii_uppercase)
+    numeros_finais = "".join(random.choices(string.digits, k=2))
+    
+    return f"{leiras_aleatorias_1}{numero_1}{letra_aleatoria_2}{numeros_finais}"
 
 
 @pytest.mark.asyncio
@@ -188,3 +200,111 @@ async def test_usuario_nao_autenticado_deve_receber_401(async_client: AsyncClien
 
     response = await async_client.post("/ordens-servico", json=payload_os)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+@pytest.mark.asyncio
+async def test_falha_cliente_nao_encontrado_ao_abrir_os(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Tentativa de abrir OS com ID de cliente inexistente.
+    Resultado esperado: 404 Not Found.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    payload_os = {
+        "cliente_id": str(uuid7()),
+        "veiculo_id": str(uuid7()),
+        "servicos": [],
+        "pecas": [],
+    }
+    response = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers
+    )
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_falha_veiculo_nao_encontrado_ao_abrir_os(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Tentativa de abrir OS com cliente válido, mas veículo inexistente.
+    Resultado esperado: 404 Not Found.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+
+    uid = str(uuid7())[:6]
+    payload_cliente = {
+        "nome": "Cliente Sem Carro",
+        "email": f"sem.carro.{uid}@oficina.com",
+        "telefone": "11944443333",
+        "cpf_cnpj": "52889394034",  # CPF Válido
+        "tipo_pessoa": "FISICA",
+    }
+    res_cli = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    assert res_cli.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cli.json()["id"]
+
+    payload_os = {
+        "cliente_id": cliente_id,
+        "veiculo_id": str(uuid7()),
+        "servicos": [],
+        "pecas": [],
+    }
+    response = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers
+    )
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_falha_servico_inexistente_no_catalogo(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Tentativa de abrir OS informando um serviço que não existe no catálogo.
+    Resultado esperado: 400 Bad Request.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+
+    uid = str(uuid7())[:6]
+    cpf_valido = CPF().generate()  # 🌟 Perfeito! Usando a biblioteca documentada
+    placa_valida = gerar_placa_valida_para_teste()  # 🌟 Placa Mercosul válida gerada dinamicamente
+    
+    # 1. Cadastra o cliente com CPF válido da biblioteca
+    payload_cliente = {
+        "nome": "Cliente Catálogo",
+        "email": f"catalogo.{uid}@oficina.com",
+        "telefone": "11933332222",
+        "cpf_cnpj": cpf_valido,
+        "tipo_pessoa": "FISICA",
+    }
+    res_cli = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    assert res_cli.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cli.json()["id"]
+
+    # 2. Cadastra o veículo com placa Mercosul válida e sem colisão de banco
+    payload_vei = {
+        "placa": placa_valida,  
+        "marca": "Fiat",
+        "modelo": "Palio",
+        "ano": 2010,
+        "cliente_id": cliente_id,
+    }
+    res_vei = await async_client.post("/veiculos", json=payload_vei, headers=headers)
+    assert res_vei.status_code == status.HTTP_201_CREATED
+    veiculo_id = res_vei.json()["id"]
+
+    # 3. Tenta abrir a OS enviando um ID de serviço inexistente
+    payload_os = {
+        "cliente_id": cliente_id,
+        "veiculo_id": veiculo_id,
+        "servicos_solicitados": [{"servico_id": str(uuid7())}],  
+        "pecas_solicitadas": [],                                 
+    }
+
+    response = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers
+    )
+    
+    # 4. Agora a barreira de validação cadastral passa lisa e bate no erro de negócio do catálogo
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
