@@ -255,28 +255,91 @@ async def token_recepcionista(db):
     )
 
 
+# UUID fixo para o Mecânico de testes
+MECANICO_TESTE_ID = UUID("019ff420-0000-7000-8000-000000000003")
+
+
 @pytest.fixture
-def token_mecanico():
+async def token_mecanico(db):
+    """
+    Gera o token e garante que o usuário mecânico fixo existe no banco
+    de forma ultra-rápida, sem criar lixo ou lentidão.
+    """
+    usuario = await db.get(Usuario, MECANICO_TESTE_ID)
+
+    if not usuario:
+        usuario = Usuario(
+            id=MECANICO_TESTE_ID,
+            nome="Mecânico de Teste",
+            email="mecanico.teste@oficina.com",
+            senha="hash_falso_ou_valido",
+            role=Role.MECANICO,
+            ativo=True,
+        )
+        db.add(usuario)
+        await db.commit()
 
     return criar_access_token(
-        usuario_id=uuid7(),
+        usuario_id=MECANICO_TESTE_ID,
         role=Role.MECANICO,
     )
 
 
+# UUID fixo para o Estoquista de testes
+ESTOQUISTA_TESTE_ID = UUID("019ff420-0000-7000-8000-000000000004")
+
+
 @pytest.fixture
-def token_estoquista():
+async def token_estoquista(db):
+    """
+    Gera o token e garante que o usuário estoquista fixo existe no banco
+    de forma ultra-rápida, sem criar lixo ou lentidão.
+    """
+    usuario = await db.get(Usuario, ESTOQUISTA_TESTE_ID)
+
+    if not usuario:
+        usuario = Usuario(
+            id=ESTOQUISTA_TESTE_ID,
+            nome="Estoquista de Teste",
+            email="estoquista.teste@oficina.com",
+            senha="hash_falso_ou_valido",
+            role=Role.ESTOQUISTA,
+            ativo=True,
+        )
+        db.add(usuario)
+        await db.commit()
 
     return criar_access_token(
-        usuario_id=uuid7(),
+        usuario_id=ESTOQUISTA_TESTE_ID,
         role=Role.ESTOQUISTA,
     )
 
 
+# UUID fixo para o Cliente de testes
+CLIENTE_TESTE_ID = UUID("019ff420-0000-7000-8000-000000000005")
+
+
 @pytest.fixture
-def token_cliente():
+async def token_cliente(db):
+    """
+    Gera o token e garante que o usuário cliente fixo existe no banco
+    de forma ultra-rápida, sem criar lixo ou lentidão.
+    """
+    usuario = await db.get(Usuario, CLIENTE_TESTE_ID)
+
+    if not usuario:
+        usuario = Usuario(
+            id=CLIENTE_TESTE_ID,
+            nome="Cliente de Teste",
+            email="cliente.teste@oficina.com",
+            senha="hash_falso_ou_valido",
+            role=Role.CLIENTE,
+            ativo=True,
+        )
+        db.add(usuario)
+        await db.commit()
 
     return criar_access_token(
-        usuario_id=uuid7(),
+        usuario_id=CLIENTE_TESTE_ID,
         role=Role.CLIENTE,
     )

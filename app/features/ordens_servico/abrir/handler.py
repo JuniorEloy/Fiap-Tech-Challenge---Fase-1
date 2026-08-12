@@ -16,7 +16,7 @@ from app.features.ordens_servico.repository import (
     OrdemServicoRepository,
 )
 
-from app.features.ordens_servico.abertura_os.schemas import (
+from app.features.ordens_servico.abrir.schemas import (
     CriarOrdemServicoRequest,
     OrdemServicoResponse,
 )

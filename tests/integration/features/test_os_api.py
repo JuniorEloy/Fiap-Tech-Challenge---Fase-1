@@ -1,4 +1,3 @@
-# tests/integration/features/test_abertura_os_api.py
 import pytest
 from fastapi import status
 from httpx import AsyncClient
@@ -6,10 +5,12 @@ from uuid import uuid7
 from validate_docbr import CPF
 import random
 import string
-
-# 🌟 Testes de Integração de API com suporte completo a RBAC (Fase 1 - Etapa 2)
-# Utiliza as fixtures oficiais configuradas em seu conftest.py para simular
-# autenticação real de cada papel do sistema.
+import base64
+import json
+from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import uuid7, UUID
+from app.features.usuarios.models import Usuario
+from sqlalchemy import select
 
 
 def gerar_placa_valida_para_teste() -> str:
@@ -505,3 +506,283 @@ async def test_falha_peca_inexistente_no_estoque_ao_abrir_os(
     )
 
     assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def gerar_placa_valida_para_teste() -> str:
+    """Gera uma placa Mercosul válida e aleatória (formato AAA9A99) para evitar colisões."""
+    letras_aleatorias_1 = "".join(random.choices(string.ascii_uppercase, k=3))
+    numero_1 = str(random.randint(0, 9))
+    letra_aleatoria_2 = random.choice(string.ascii_uppercase)
+    numeros_finais = "".join(random.choices(string.digits, k=2))
+    return f"{letras_aleatorias_1}{numero_1}{letra_aleatoria_2}{numeros_finais}"
+
+
+async def garantir_usuario_existe_no_banco(
+    token: str, role: str, db: AsyncSession, uid: str
+) -> str:
+    """Decodifica o payload do JWT, obtém o sub (UUID) e insere fisicamente na tabela usuarios se não existir."""
+    token_parts = token.split(".")
+    payload_decoded = base64.b64decode(token_parts[1] + "==").decode("utf-8")
+    payload_json = json.loads(payload_decoded)
+    user_id = payload_json["sub"]
+
+    res = await db.execute(select(Usuario).where(Usuario.id == user_id))
+    user_db = res.scalar_one_or_none()
+    if not user_db:
+        new_user = Usuario(
+            id=UUID(user_id),
+            nome=f"Usuario Teste {role.capitalize()} {uid}",
+            email=f"{role.lower()}.{uid}@oficina.com",
+            role=role,
+            ativo=True,
+        )
+        db.add(new_user)
+        await db.commit()
+    return user_id
+
+
+@pytest.mark.asyncio
+async def test_mecanico_deve_lancar_diagnostico_com_sucesso(
+    async_client: AsyncClient,
+    token_recepcionista: str,
+    token_estoquista: str,
+    token_mecanico: str,
+    db: AsyncSession,
+):
+    """
+    Cenário: Mecânico assume o veículo em triagem, identifica anomalias físicas,
+             e lança o diagnóstico com serviços e peças do catálogo.
+    Resultado esperado: 200 OK, OS alterada para AGUARDANDO_APROVACAO com preços congelados.
+    """
+    headers_recep = {"Authorization": f"Bearer {token_recepcionista}"}
+    headers_estoque = {"Authorization": f"Bearer {token_estoquista}"}
+    headers_meca = {"Authorization": f"Bearer {token_mecanico}"}
+
+    uid = str(uuid7())[:6]
+
+    # Garante que os usuários reais dos tokens existam fisicamente no banco de dados para evitar ForeignKeyViolation
+    await garantir_usuario_existe_no_banco(
+        token_recepcionista, "RECEPCIONISTA", db, uid
+    )
+    await garantir_usuario_existe_no_banco(token_estoquista, "ESTOQUISTA", db, uid)
+    mecanico_id = await garantir_usuario_existe_no_banco(
+        token_mecanico, "MECANICO", db, uid
+    )
+
+    # 1. Recepção cadastra o cliente (usando CPF matematicamente válido)
+    payload_cliente = {
+        "nome": f"Carla Souza Diagnostico {uid}",
+        "email": f"carla.diagnostico.{uid}@gmail.com",
+        "telefone": "11988887777",
+        "cpf_cnpj": CPF().generate(),
+        "tipo_pessoa": "FISICA",
+    }
+    res_cliente = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers_recep
+    )
+    assert res_cliente.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cliente.json()["id"]
+
+    # 2. Recepção cadastra o veículo
+    payload_veiculo = {
+        "placa": gerar_placa_valida_para_teste(),
+        "marca": "Honda",
+        "modelo": "Civic",
+        "ano": 2021,
+        "cliente_id": cliente_id,
+    }
+    res_veiculo = await async_client.post(
+        "/veiculos", json=payload_veiculo, headers=headers_recep
+    )
+    assert res_veiculo.status_code == status.HTTP_201_CREATED
+    veiculo_id = res_veiculo.json()["id"]
+
+    # 3. Recepção cadastra um Serviço Base padrão no catálogo
+    payload_servico = {
+        "nome": f"Troca de Velas e Bobinas {uid}",
+        "descricao": "Substituição preventiva do sistema de ignição",
+        "preco_mao_de_obra": 150.00,
+        "duracao_estimada_minutos": 45,
+        "permite_servico_expresso": False,
+    }
+    res_servico = await async_client.post(
+        "/servicos", json=payload_servico, headers=headers_recep
+    )
+    assert res_servico.status_code == status.HTTP_201_CREATED
+    servico_id = res_servico.json()["id"]
+
+    # 4. Estoquista cadastra as peças no estoque
+    payload_peca = {
+        "nome": f"Jogo de Velas Iridium NGK {uid}",
+        "descricao": "Velas de ignição de alta performance e longa durabilidade",
+        "preco_custo": 80.00,
+        "preco_venda": 160.00,
+        "quantidade_inicial": 10,
+        "limite_minimo": 3,
+    }
+    res_peca = await async_client.post(
+        "/estoque", json=payload_peca, headers=headers_estoque
+    )
+    assert res_peca.status_code == status.HTTP_201_CREATED
+    peca_id = res_peca.json()["id"]
+
+    # 5. Recepção efetua o Check-in abrindo a OS vazia (sem serviços)
+    # Como não há itens na abertura, ela cai obrigatoriamente em "EM_DIAGNOSTICO"
+    payload_os = {
+        "cliente_id": cliente_id,
+        "veiculo_id": veiculo_id,
+        "servicos": [],
+        "pecas": [],
+    }
+    res_os = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers_recep
+    )
+    assert res_os.status_code == status.HTTP_201_CREATED
+    os_id = res_os.json()["id"]
+    assert res_os.json()["status"] == "EM_DIAGNOSTICO"
+
+    # 6. Mecânico executa a desmontagem física e lança o diagnóstico técnico
+    payload_diagnostico = {
+        "servicos": [{"servico_id": servico_id}],
+        "pecas": [{"peca_id": peca_id, "quantidade": 1}],
+    }
+
+    response = await async_client.put(
+        f"/ordens-servico/{os_id}/diagnostico",
+        json=payload_diagnostico,
+        headers=headers_meca,
+    )
+
+    # 7. Asserções de sucesso do diagnóstico
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["id"] == os_id
+    assert body["status"] == "AGUARDANDO_APROVACAO"  # FSM transicionou automaticamente!
+    assert body["mecanico_id"] == mecanico_id  # Mecânico foi amarrado à OS
+
+    # Verifica o congelamento de preços de serviços
+    assert len(body["itens_servico"]) == 1
+    assert body["itens_servico"][0]["servico_id"] == servico_id
+    assert body["itens_servico"][0]["preco_aplicado"] == "150.00"
+    assert body["itens_servico"][0]["duracao_minutos"] == 45
+
+    # Verifica o congelamento de preços de peças de estoque
+    assert len(body["itens_peca"]) == 1
+    assert body["itens_peca"][0]["peca_id"] == peca_id
+    assert body["itens_peca"][0]["preco_unitario_aplicado"] == "160.00"
+    assert body["itens_peca"][0]["quantidade"] == 1
+
+
+@pytest.mark.asyncio
+async def test_recepcionista_nao_deve_conseguir_lancar_diagnostico(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Recepcionista tenta lançar o laudo de diagnóstico (violação de papéis).
+    Resultado esperado: 403 Forbidden (RBAC blinda o endpoint).
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    os_id_fake = str(uuid7())
+    payload = {"servicos": [{"servico_id": str(uuid7())}], "pecas": []}
+
+    response = await async_client.put(
+        f"/ordens-servico/{os_id_fake}/diagnostico", json=payload, headers=headers
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_mecanico_deve_visualizar_apenas_suas_ordens_de_servico_ativas(
+    async_client: AsyncClient,
+    token_recepcionista: str,
+    token_mecanico: str,
+    db: AsyncSession,
+):
+    """
+    Cenário: Mecânico acessa seu painel pessoal de trabalho.
+    Resultado esperado: 200 OK contendo apenas OSs atribuídas a ele em DIAGNÓSTICO ou EXECUÇÃO.
+    """
+    headers_recep = {"Authorization": f"Bearer {token_recepcionista}"}
+    headers_meca = {"Authorization": f"Bearer {token_mecanico}"}
+
+    uid = str(uuid7())[:6]
+
+    # Garante que os usuários reais existam
+    await garantir_usuario_existe_no_banco(
+        token_recepcionista, "RECEPCIONISTA", db, uid
+    )
+    mecanico_id = await garantir_usuario_existe_no_banco(
+        token_mecanico, "MECANICO", db, uid
+    )
+
+    # 1. Criamos um cliente e veículo
+    payload_cliente = {
+        "nome": f"Marcos Lima Painel {uid}",
+        "email": f"marcos.painel.{uid}@gmail.com",
+        "telefone": "11977776666",
+        "cpf_cnpj": CPF().generate(),
+        "tipo_pessoa": "FISICA",
+    }
+    res_cliente = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers_recep
+    )
+    cliente_id = res_cliente.json()["id"]
+
+    payload_veiculo = {
+        "placa": gerar_placa_valida_para_teste(),
+        "marca": "Fiat",
+        "modelo": "Marea Turbo",
+        "ano": 2005,
+        "cliente_id": cliente_id,
+    }
+    res_veiculo = await async_client.post(
+        "/veiculos", json=payload_veiculo, headers=headers_recep
+    )
+    veiculo_id = res_veiculo.json()["id"]
+
+    # 2. Criamos um Serviço Base no catálogo
+    payload_serv = {
+        "nome": f"Inspeção de Turbina {uid}",
+        "descricao": "Varredura de folgas em eixos de compressor",
+        "preco_mao_de_obra": 200.00,
+        "duracao_estimada_minutos": 60,
+        "permite_servico_expresso": False,
+    }
+    res_serv = await async_client.post(
+        "/servicos", json=payload_serv, headers=headers_recep
+    )
+    servico_id = res_serv.json()["id"]
+
+    # 3. Abre-se a OS
+    payload_os = {
+        "cliente_id": cliente_id,
+        "veiculo_id": veiculo_id,
+        "servicos": [],
+        "pecas": [],
+    }
+    res_os = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers_recep
+    )
+    os_id = res_os.json()["id"]
+
+    # 4. Mecânico acessa a lista "minhas-os" - Deve vir vazia inicialmente pois nenhuma OS está atribuída a ele
+    res_lista_inicial = await async_client.get(
+        "/ordens-servico/mecanico/minhas-os", headers=headers_meca
+    )
+    assert res_lista_inicial.status_code == status.HTTP_200_OK
+    assert os_id not in [item["id"] for item in res_lista_inicial.json()]
+
+    # 5. Mecânico assume a OS realizando o diagnóstico (o handler atrela o mecanico_id a ele!)
+    payload_diagnostico = {"servicos": [{"servico_id": servico_id}], "pecas": []}
+    await async_client.put(
+        f"/ordens-servico/{os_id}/diagnostico",
+        json=payload_diagnostico,
+        headers=headers_meca,
+    )
+
+    # 6. Agora a OS está no status AGUARDANDO_APROVACAO (não deve aparecer no painel operacional de pátio!)
+    res_lista_pos_diagnostico = await async_client.get(
+        "/ordens-servico/mecanico/minhas-os", headers=headers_meca
+    )
+    assert res_lista_pos_diagnostico.status_code == status.HTTP_200_OK
+    assert os_id not in [item["id"] for item in res_lista_pos_diagnostico.json()]

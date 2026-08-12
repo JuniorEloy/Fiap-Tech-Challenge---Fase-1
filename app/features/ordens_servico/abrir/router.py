@@ -7,8 +7,8 @@ from app.shared.security.dependencies import requer_roles, obter_usuario_atual
 from app.shared.security.roles import Role
 from app.shared.security.schemas import UsuarioToken
 
-from app.features.ordens_servico.abertura_os.handler import CriarOrdemServicoHandler
-from app.features.ordens_servico.abertura_os.schemas import (
+from app.features.ordens_servico.abrir.handler import CriarOrdemServicoHandler
+from app.features.ordens_servico.abrir.schemas import (
     CriarOrdemServicoRequest,
     OrdemServicoResponse,
 )
