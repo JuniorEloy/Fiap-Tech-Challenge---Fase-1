@@ -7,10 +7,12 @@ import random
 import string
 import base64
 import json
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import uuid7, UUID
-from app.features.usuarios.models import Usuario
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.features.usuarios.models import Usuario
+from app.features.estoque.models import PecaInsumo
+from app.features.ordens_servico.models import StatusOS, OrdemServico
 
 
 def gerar_placa_valida_para_teste() -> str:
@@ -786,3 +788,427 @@ async def test_mecanico_deve_visualizar_apenas_suas_ordens_de_servico_ativas(
     )
     assert res_lista_pos_diagnostico.status_code == status.HTTP_200_OK
     assert os_id not in [item["id"] for item in res_lista_pos_diagnostico.json()]
+
+
+def gerar_placa_valida_para_teste() -> str:
+    """Gera uma placa Mercosul válida e aleatória (formato AAA9A99) para evitar colisões."""
+    letras_aleatorias_1 = "".join(random.choices(string.ascii_uppercase, k=3))
+    numero_1 = str(random.randint(0, 9))
+    letra_aleatoria_2 = random.choice(string.ascii_uppercase)
+    numeros_finais = "".join(random.choices(string.digits, k=2))
+    return f"{letras_aleatorias_1}{numero_1}{letra_aleatoria_2}{numeros_finais}"
+
+
+async def garantir_usuario_existe_no_banco(
+    token: str, role: str, db: AsyncSession, uid: str
+) -> str:
+    """Decodifica o payload do JWT, obtém o sub (UUID) e insere fisicamente na tabela usuarios se não existir."""
+    token_parts = token.split(".")
+    payload_decoded = base64.b64decode(token_parts[1] + "==").decode("utf-8")
+    payload_json = json.loads(payload_decoded)
+    user_id = payload_json["sub"]
+
+    res = await db.execute(select(Usuario).where(Usuario.id == user_id))
+    user_db = res.scalar_one_or_none()
+    if not user_db:
+        new_user = Usuario(
+            id=UUID(user_id),
+            nome=f"Usuario Teste {role.capitalize()} {uid}",
+            email=f"{role.lower()}.{uid}@oficina.com",
+            role=role,
+            ativo=True,
+        )
+        db.add(new_user)
+        await db.commit()
+    return user_id
+
+
+@pytest.mark.asyncio
+async def test_cliente_deve_aprovar_orcamento_com_sucesso_via_portal_publico(
+    async_client: AsyncClient,
+    token_recepcionista: str,
+    token_estoquista: str,
+    token_mecanico: str,
+    db: AsyncSession,
+):
+    """
+    Cenário: Orçamento emitido em diagnóstico e enviado ao cliente. O cliente
+             acessa o link público (com hash), aprova o orçamento e o sistema
+             baixa o estoque pessimamente, passando a OS para EM_EXECUCAO.
+    Resultado esperado: 200 OK, status mudado para EM_EXECUCAO e estoque decrementado.
+    """
+    headers_recep = {"Authorization": f"Bearer {token_recepcionista}"}
+    headers_estoque = {"Authorization": f"Bearer {token_estoquista}"}
+    headers_meca = {"Authorization": f"Bearer {token_mecanico}"}
+
+    uid = str(uuid7())[:6]
+
+    # Garante que os usuários do token existam na tabela usuarios
+    await garantir_usuario_existe_no_banco(
+        token_recepcionista, "RECEPCIONISTA", db, uid
+    )
+    await garantir_usuario_existe_no_banco(token_estoquista, "ESTOQUISTA", db, uid)
+    await garantir_usuario_existe_no_banco(token_mecanico, "MECANICO", db, uid)
+
+    # 1. Cadastra Cliente e Veículo
+    payload_cliente = {
+        "nome": f"Rodrigo Aprovador {uid}",
+        "email": f"rodrigo.aprovador.{uid}@gmail.com",
+        "telefone": "11988887777",
+        "cpf_cnpj": CPF().generate(),
+        "tipo_pessoa": "FISICA",
+    }
+    res_cliente = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers_recep
+    )
+    assert res_cliente.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cliente.json()["id"]
+
+    payload_veiculo = {
+        "placa": gerar_placa_valida_para_teste(),
+        "marca": "Toyota",
+        "modelo": "Yaris",
+        "ano": 2022,
+        "cliente_id": cliente_id,
+    }
+    res_veiculo = await async_client.post(
+        "/veiculos", json=payload_veiculo, headers=headers_recep
+    )
+    assert res_veiculo.status_code == status.HTTP_201_CREATED
+    veiculo_id = res_veiculo.json()["id"]
+
+    # 2. Cadastra Serviço e Peça de Estoque
+    payload_servico = {
+        "nome": f"Revisão Completa Yaris {uid}",
+        "descricao": "Troca de filtros e fluidos gerais",
+        "preco_mao_de_obra": 300.00,
+        "duracao_estimada_minutos": 120,
+        "permite_servico_expresso": False,
+    }
+    res_servico = await async_client.post(
+        "/servicos", json=payload_servico, headers=headers_recep
+    )
+    assert res_servico.status_code == status.HTTP_201_CREATED
+    servico_id = res_servico.json()["id"]
+
+    payload_peca = {
+        "nome": f"Filtro de Óleo Bosch Yaris {uid}",
+        "descricao": "Filtro de óleo blindado Bosch",
+        "preco_custo": 25.00,
+        "preco_venda": 60.00,
+        "quantidade_inicial": 10,
+        "limite_minimo": 2,
+    }
+    res_peca = await async_client.post(
+        "/estoque", json=payload_peca, headers=headers_estoque
+    )
+    assert res_peca.status_code == status.HTTP_201_CREATED
+    peca_id = res_peca.json()["id"]
+
+    # 3. Abre a OS na triagem (vazia, EM_DIAGNOSTICO)
+    payload_os = {
+        "cliente_id": cliente_id,
+        "veiculo_id": veiculo_id,
+        "servicos": [],
+        "pecas": [],
+    }
+    res_os = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers_recep
+    )
+    assert res_os.status_code == status.HTTP_201_CREATED
+    os_id = res_os.json()["id"]
+    visualizacao_hash = res_os.json()["visualizacao_hash"]
+
+    # 4. Mecânico preenche o laudo técnico do diagnóstico
+    payload_diagnostico = {
+        "servicos": [{"servico_id": servico_id}],
+        "pecas": [{"peca_id": peca_id, "quantidade": 2}],
+    }
+    res_diag = await async_client.put(
+        f"/ordens-servico/{os_id}/diagnostico",
+        json=payload_diagnostico,
+        headers=headers_meca,
+    )
+    assert res_diag.status_code == status.HTTP_200_OK
+    assert res_diag.json()["status"] == "AGUARDANDO_APROVACAO"
+
+    # 5. Cliente acessa o link público com o hash e responde "Aprovado"
+    payload_resposta = {
+        "aprovado": True,
+        "observacoes_cliente": "Pode fazer o serviço, preciso do carro até amanhã às 18h!",
+    }
+    response = await async_client.post(
+        f"/ordens-servico/publica/{visualizacao_hash}/responder", json=payload_resposta
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    body = response.json()
+    assert body["status"] == "EM_EXECUCAO"
+    assert (
+        body["observacoes_cliente"]
+        == "Pode fazer o serviço, preciso do carro até amanhã às 18h!"
+    )
+    assert body["data_resposta_cliente"] is not None
+    assert body["tempo_espera_aprovacao_minutos"] is not None
+
+    # 6. Verifica se a baixa de estoque com lock pessimista ocorreu com precisão
+    db.expire_all()
+    res_peca_db = await db.execute(select(PecaInsumo).where(PecaInsumo.id == peca_id))
+    peca_final = res_peca_db.scalar_one()
+    # Tinha 10 unidades, foram usadas 2. Sobram 8.
+    assert peca_final.quantidade_em_estoque == 8
+
+
+@pytest.mark.asyncio
+async def test_recepcionista_deve_registrar_rejeicao_do_cliente_por_telefone(
+    async_client: AsyncClient,
+    token_recepcionista: str,
+    token_estoquista: str,
+    token_mecanico: str,
+    db: AsyncSession,
+):
+    """
+    Cenário: O orçamento foi emitido, o cliente rejeita o orçamento por telefone,
+             e a Recepcionista registra a rejeição no painel da oficina.
+    Resultado esperado: 200 OK, status transiciona para CANCELADA e o estoque não é alterado.
+    """
+    headers_recep = {"Authorization": f"Bearer {token_recepcionista}"}
+    headers_estoque = {"Authorization": f"Bearer {token_estoquista}"}
+    headers_meca = {"Authorization": f"Bearer {token_mecanico}"}
+
+    uid = str(uuid7())[:6]
+
+    await garantir_usuario_existe_no_banco(
+        token_recepcionista, "RECEPCIONISTA", db, uid
+    )
+    await garantir_usuario_existe_no_banco(token_estoquista, "ESTOQUISTA", db, uid)
+    await garantir_usuario_existe_no_banco(token_mecanico, "MECANICO", db, uid)
+
+    # 1. Cadastra Cliente e Veículo
+    payload_cliente = {
+        "nome": f"Cláudio Rejeitador {uid}",
+        "email": f"claudio.{uid}@gmail.com",
+        "telefone": "11966665555",
+        "cpf_cnpj": CPF().generate(),
+        "tipo_pessoa": "FISICA",
+    }
+    res_cli = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers_recep
+    )
+    cliente_id = res_cli.json()["id"]
+
+    payload_veiculo = {
+        "placa": gerar_placa_valida_para_teste(),
+        "marca": "Ford",
+        "modelo": "Ka",
+        "ano": 2018,
+        "cliente_id": cliente_id,
+    }
+    res_vei = await async_client.post(
+        "/veiculos", json=payload_veiculo, headers=headers_recep
+    )
+    veiculo_id = res_vei.json()["id"]
+
+    # 2. Cadastra Serviço e Peça de Estoque
+    res_serv = await async_client.post(
+        "/servicos",
+        json={
+            "nome": f"Troca de Disco de Freio {uid}",
+            "preco_mao_de_obra": 150.00,
+            "duracao_estimada_minutos": 60,
+            "permite_servico_expresso": False,
+        },
+        headers=headers_recep,
+    )
+    servico_id = res_serv.json()["id"]
+
+    res_peca = await async_client.post(
+        "/estoque",
+        json={
+            "nome": f"Par de Discos Freio Bosch {uid}",
+            "preco_custo": 90.00,
+            "preco_venda": 180.00,
+            "quantidade_inicial": 5,
+            "limite_minimo": 1,
+        },
+        headers=headers_estoque,
+    )
+    peca_id = res_peca.json()["id"]
+
+    # 3. Abre OS e lança diagnóstico
+    res_os = await async_client.post(
+        "/ordens-servico",
+        json={"cliente_id": cliente_id, "veiculo_id": veiculo_id},
+        headers=headers_recep,
+    )
+    os_id = res_os.json()["id"]
+
+    await async_client.put(
+        f"/ordens-servico/{os_id}/diagnostico",
+        json={
+            "servicos": [{"servico_id": servico_id}],
+            "pecas": [{"peca_id": peca_id, "quantidade": 1}],
+        },
+        headers=headers_meca,
+    )
+
+    # 4. Recepcionista registra a rejeição do cliente
+    payload_rejeicao = {
+        "aprovado": False,
+        "observacoes_cliente": "Cliente achou o valor muito alto e fará no próximo mês.",
+    }
+    response = await async_client.post(
+        f"/ordens-servico/{os_id}/resposta",
+        json=payload_rejeicao,
+        headers=headers_recep,
+    )
+    assert response.status_code == status.HTTP_200_OK
+
+    body = response.json()
+    assert body["status"] == "CANCELADA"
+    assert (
+        body["observacoes_cliente"]
+        == "Cliente achou o valor muito alto e fará no próximo mês."
+    )
+
+    # 5. Garante que nenhuma peça foi retirada do estoque
+    db.expire_all()
+    res_peca_db = await db.execute(select(PecaInsumo).where(PecaInsumo.id == peca_id))
+    peca_final = res_peca_db.scalar_one()
+    # Continuou com as 5 iniciais
+    assert peca_final.quantidade_em_estoque == 5
+
+
+@pytest.mark.asyncio
+async def test_falha_na_aprovacao_se_estoque_for_insuficiente(
+    async_client: AsyncClient,
+    token_recepcionista: str,
+    token_estoquista: str,
+    token_mecanico: str,
+    db: AsyncSession,
+):
+    """
+    Cenário: O diagnóstico demanda 5 peças de reposição, mas o estoque possui apenas 3 unidades.
+             O cliente tenta aprovar a execução.
+    Resultado esperado: 400 Bad Request, informando o saldo insuficiente, mantendo a OS em AGUARDANDO_APROVACAO.
+    """
+    headers_recep = {"Authorization": f"Bearer {token_recepcionista}"}
+    headers_estoque = {"Authorization": f"Bearer {token_estoquista}"}
+    headers_meca = {"Authorization": f"Bearer {token_mecanico}"}
+
+    uid = str(uuid7())[:6]
+
+    await garantir_usuario_existe_no_banco(
+        token_recepcionista, "RECEPCIONISTA", db, uid
+    )
+    await garantir_usuario_existe_no_banco(token_estoquista, "ESTOQUISTA", db, uid)
+    await garantir_usuario_existe_no_banco(token_mecanico, "MECANICO", db, uid)
+
+    # 1. Criação do cliente e veículo
+    res_cli = await async_client.post(
+        "/clientes",
+        json={
+            "nome": f"Estoque Falho {uid}",
+            "email": f"estoque.{uid}@gmail.com",
+            "telefone": "11955554444",
+            "cpf_cnpj": CPF().generate(),
+            "tipo_pessoa": "FISICA",
+        },
+        headers=headers_recep,
+    )
+    cliente_id = res_cli.json()["id"]
+
+    res_vei = await async_client.post(
+        "/veiculos",
+        json={
+            "placa": gerar_placa_valida_para_teste(),
+            "marca": "Chevrolet",
+            "modelo": "Cruze",
+            "ano": 2019,
+            "cliente_id": cliente_id,
+        },
+        headers=headers_recep,
+    )
+    veiculo_id = res_vei.json()["id"]
+
+    # 2. Criação do catálogo (Temos apenas 3 amortecedores em estoque)
+    res_serv = await async_client.post(
+        "/servicos",
+        json={
+            "nome": f"Troca de Amortecedores Dianteiros {uid}",
+            "preco_mao_de_obra": 200.00,
+            "duracao_estimada_minutos": 90,
+            "permite_servico_expresso": False,
+        },
+        headers=headers_recep,
+    )
+    servico_id = res_serv.json()["id"]
+
+    res_peca = await async_client.post(
+        "/estoque",
+        json={
+            "nome": f"Amortecedor Cofap Cruze {uid}",
+            "preco_custo": 150.00,
+            "preco_venda": 350.00,
+            "quantidade_inicial": 3,  # 🌟 Estoque real: 3 unidades
+            "limite_minimo": 1,
+        },
+        headers=headers_estoque,
+    )
+    peca_id = res_peca.json()["id"]
+
+    # 3. Abre OS e diagnóstico (solicitando 4 amortecedores - acima do estoque)
+    res_os = await async_client.post(
+        "/ordens-servico",
+        json={"cliente_id": cliente_id, "veiculo_id": veiculo_id},
+        headers=headers_recep,
+    )
+    os_id = res_os.json()["id"]
+    visualizacao_hash = res_os.json()["visualizacao_hash"]
+
+    # Mecânico põe 4 amortecedores no diagnóstico
+    await async_client.put(
+        f"/ordens-servico/{os_id}/diagnostico",
+        json={
+            "servicos": [{"servico_id": servico_id}],
+            "pecas": [{"peca_id": peca_id, "quantidade": 4}],
+        },
+        headers=headers_meca,
+    )
+
+    # 4. Cliente tenta aprovar
+    response = await async_client.post(
+        f"/ordens-servico/publica/{visualizacao_hash}/responder",
+        json={"aprovado": True},
+    )
+
+    # Deve falhar pois o pátio não possui peças físicas para suportar a aprovação!
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Saldo insuficiente no estoque" in response.json()["detail"]
+
+    # 5. Garante que o status da OS continuou inalterado e o estoque intocado
+    db.expire_all()
+    res_os_db = await db.execute(select(OrdemServico).where(OrdemServico.id == os_id))
+    os_final = res_os_db.scalar_one()
+    assert os_final.status == StatusOS.AGUARDANDO_APROVACAO
+
+    res_peca_db = await db.execute(select(PecaInsumo).where(PecaInsumo.id == peca_id))
+    peca_final = res_peca_db.scalar_one()
+    assert peca_final.quantidade_em_estoque == 3
+
+
+@pytest.mark.asyncio
+async def test_mecanico_nao_deve_conseguir_registrar_resposta_de_cliente(
+    async_client: AsyncClient, token_mecanico: str
+):
+    """
+    Cenário: Mecânico tenta atualizar a resposta do cliente usando o ID da OS (violação de RBAC).
+    Resultado esperado: 403 Forbidden.
+    """
+    headers = {"Authorization": f"Bearer {token_mecanico}"}
+    payload = {"aprovado": True}
+
+    response = await async_client.post(
+        f"/ordens-servico/{uuid7()}/resposta", json=payload, headers=headers
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN

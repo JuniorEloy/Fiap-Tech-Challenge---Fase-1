@@ -347,7 +347,7 @@ class OrdemServicoStatusLog(Base):
 
     operador_id: Mapped[UUID] = mapped_column(
         ForeignKey("usuarios.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
         comment="Referência ao operador autenticado",
     )
 
