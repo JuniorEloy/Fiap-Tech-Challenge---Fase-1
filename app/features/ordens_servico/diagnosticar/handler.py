@@ -47,7 +47,7 @@ class LancarDiagnosticoHandler:
         if os.status != StatusOS.EM_DIAGNOSTICO:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Não é possível lançar diagnóstico para uma OS com status atual: {getattr(os.status, "value", os.status)}.",
+                detail=f"Não é possível lançar diagnóstico para uma OS com status atual: {getattr(os.status, 'value', os.status)}.",
             )
 
         # 3. Assume a responsabilidade técnica do veículo

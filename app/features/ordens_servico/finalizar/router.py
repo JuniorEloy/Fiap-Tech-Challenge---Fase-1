@@ -9,7 +9,10 @@ from app.shared.security.roles import Role
 from app.shared.security.schemas import UsuarioToken
 
 from app.features.ordens_servico.finalizar.handler import FinalizarOrdemServicoHandler
-from app.features.ordens_servico.finalizar.schemas import FinalizarOrdemServicoRequest, FinalizacaoOSResponse
+from app.features.ordens_servico.finalizar.schemas import (
+    FinalizarOrdemServicoRequest,
+    FinalizacaoOSResponse,
+)
 
 router = APIRouter(prefix="/ordens-servico", tags=["Gestão de Ordens de Serviço"])
 
@@ -18,13 +21,13 @@ router = APIRouter(prefix="/ordens-servico", tags=["Gestão de Ordens de Serviç
     "/{id}/finalizar",
     response_model=FinalizacaoOSResponse,
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(requer_roles([Role.MECANICO, Role.GERENTE]))]
+    dependencies=[Depends(requer_roles([Role.MECANICO, Role.GERENTE]))],
 )
 async def finalizar_ordem_servico(
     id: UUID,
     payload: FinalizarOrdemServicoRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    operador_atual: Annotated[UsuarioToken, Depends(obter_usuario_atual)]
+    operador_atual: Annotated[UsuarioToken, Depends(obter_usuario_atual)],
 ):
     """
     Encerra e finaliza a execução dos serviços técnicos de uma Ordem de Serviço em andamento.
@@ -33,4 +36,6 @@ async def finalizar_ordem_servico(
     Acesso autorizado apenas para MECÂNICO ou GERENTE.
     """
     handler = FinalizarOrdemServicoHandler(db)
-    return await handler.executar(os_id=id, command=payload, mecanico_id=operador_atual.id)
+    return await handler.executar(
+        os_id=id, command=payload, mecanico_id=operador_atual.id
+    )

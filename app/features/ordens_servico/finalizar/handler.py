@@ -5,7 +5,10 @@ from decimal import Decimal
 
 from app.features.ordens_servico.models import StatusOS
 from app.features.ordens_servico.repository import OrdemServicoRepository
-from app.features.ordens_servico.finalizar.schemas import FinalizarOrdemServicoRequest, FinalizacaoOSResponse
+from app.features.ordens_servico.finalizar.schemas import (
+    FinalizarOrdemServicoRequest,
+    FinalizacaoOSResponse,
+)
 
 
 class FinalizarOrdemServicoHandler:
@@ -14,10 +17,7 @@ class FinalizarOrdemServicoHandler:
         self.repository = OrdemServicoRepository(db)
 
     async def executar(
-        self,
-        os_id: UUID,
-        command: FinalizarOrdemServicoRequest,
-        mecanico_id: UUID
+        self, os_id: UUID, command: FinalizarOrdemServicoRequest, mecanico_id: UUID
     ) -> FinalizacaoOSResponse:
         """
         Orquestra a finalização e conclusão de serviços de uma Ordem de Serviço:
@@ -34,7 +34,7 @@ class FinalizarOrdemServicoHandler:
         if not os:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Ordem de Serviço não encontrada no sistema."
+                detail="Ordem de Serviço não encontrada no sistema.",
             )
 
         # 2. Valida se a OS está em andamento (manutenção ativa)
@@ -43,7 +43,7 @@ class FinalizarOrdemServicoHandler:
             status_atual = getattr(os.status, "value", os.status)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Não é possível concluir uma OS que não está em execução. Status atual: {status_atual}."
+                detail=f"Não é possível concluir uma OS que não está em execução. Status atual: {status_atual}.",
             )
 
         # 3. Adiciona observações finais se fornecidas
@@ -56,7 +56,9 @@ class FinalizarOrdemServicoHandler:
 
         # 5. Calcula dinamicamente os valores de faturamento com base nos preços congelados
         valor_servicos = sum(item.preco_aplicado for item in os.itens_servico)
-        valor_pecas = sum(item.preco_unitario_aplicado * item.quantidade for item in os.itens_peca)
+        valor_pecas = sum(
+            item.preco_unitario_aplicado * item.quantidade for item in os.itens_peca
+        )
         valor_total = valor_servicos + valor_pecas
 
         # 6. Grava tudo de forma transacional no banco

@@ -45,7 +45,7 @@ class ResponderOrcamentoHandler:
         if os.status != StatusOS.AGUARDANDO_APROVACAO:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Não é possível responder a um orçamento de uma OS no status atual: {getattr(os.status, "value", os.status)}.",
+                detail=f"Não é possível responder a um orçamento de uma OS no status atual: {getattr(os.status, 'value', os.status)}.",
             )
 
         # Armazena observações, se fornecidas
