@@ -4,7 +4,7 @@ from uuid import UUID
 from typing import Optional, List
 from sqlalchemy import String, DateTime, Integer, ForeignKey, select
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from uuid6 import uuid7
+from uuid import uuid7
 from app.shared.models.base import Base
 from decimal import Decimal
 from sqlalchemy import Numeric
@@ -59,7 +59,7 @@ class OrdemServico(Base):
     )
 
     cliente_id: Mapped[UUID] = mapped_column(
-        ForeignKey("usuarios.id", ondelete="RESTRICT"),
+        ForeignKey("clientes.id", ondelete="RESTRICT"),
         nullable=False,
         index=True,
         comment="Referência ao Cliente associado à OS",
@@ -90,11 +90,8 @@ class OrdemServico(Base):
     # 🔒 Prevenção de IDOR: Chave secundária criptográfica e opaca gerada no check-in
     # Enviada via WhatsApp para acesso público direto e seguro sem login pelo cliente.
     visualizacao_hash: Mapped[UUID] = mapped_column(
-        ForeignKey(
-            "usuarios.id", ondelete="RESTRICT"
-        ),  # opcional, mas recomendável usar uuid4 nativo
         nullable=False,
-        default=uuid7,  # UUID temporal ou uuid4 opaco
+        default=uuid7,  
         unique=True,
         comment="Hash criptográfico opaco utilizado para acompanhamento seguro pelo cliente sem expor o ID sequencial",
     )

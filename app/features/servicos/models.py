@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy import String, Numeric, Integer, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from app.shared.models.base import Base
-from uuid6 import uuid7
+from uuid import uuid7
 
 
 class ServicoBase(Base):

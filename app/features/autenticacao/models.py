@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from uuid6 import uuid7
+from uuid import uuid7
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (

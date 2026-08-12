@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timedelta
 from uuid import uuid7
-from app.features.ordem_servico.models import (
+from app.features.ordens_servico.models import (
     OrdemServico,
     StatusOS,
     OrdemServicoStatusLog,

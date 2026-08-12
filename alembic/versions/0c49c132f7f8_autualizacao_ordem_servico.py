@@ -1,11 +1,10 @@
 """autualizacao ordem servico
 
-Revision ID: e87c7bcd4423
-Revises: dc3f6ac971ed
-Create Date: 2026-08-11 20:37:14.819928
+Revision ID: 0c49c132f7f8
+Revises: 106fc1b9597a
+Create Date: 2026-08-11 22:05:48.277560
 
 """
-
 from typing import Sequence, Union
 
 from alembic import op
@@ -13,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = "e87c7bcd4423"
-down_revision: Union[str, Sequence[str], None] = "dc3f6ac971ed"
+revision: str = '0c49c132f7f8'
+down_revision: Union[str, Sequence[str], None] = '106fc1b9597a'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

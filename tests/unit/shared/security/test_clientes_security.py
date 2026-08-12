@@ -1,7 +1,7 @@
 import pytest
 
 import pytest_asyncio
-from uuid6 import uuid7
+from uuid import uuid7
 
 from fastapi import status
 from httpx import AsyncClient

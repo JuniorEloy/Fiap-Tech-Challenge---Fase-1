@@ -20,7 +20,8 @@ from app.features.usuarios.models import Usuario
 from app.shared.security.roles import Role
 from app.shared.security.password import gerar_hash_senha
 from app.shared.security.tokens import criar_access_token
-
+from app.features.usuarios.models import Usuario
+from uuid import UUID
 
 TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5433/fiap_test"
 
@@ -195,22 +196,59 @@ async def usuario_cliente(db):
 # ==============================================================================
 
 
+from uuid import UUID
+import pytest
+from app.shared.security.tokens import criar_access_token
+from sqlalchemy import text
+
+# UUID fixo para o Gerente de testes (compartilhado e reutilizado instantaneamente)
+GERENTE_TESTE_ID = UUID("019ff420-0000-7000-8000-000000000001")
+
 @pytest.fixture
-def token_gerente():
+async def token_gerente(db):
+    """
+    Gera o token e garante que o usuário gerente fixo existe no banco 
+    de forma ultra-rápida, sem criar lixo ou lentidão.
+    """
+    usuario = await db.get(Usuario, GERENTE_TESTE_ID)
+    if not usuario:
+        usuario = Usuario(
+            id=GERENTE_TESTE_ID,
+            nome="Gerente de Teste",
+            email="gerente.teste@oficina.com",
+            senha="hash_falso_ou_valido",
+            role=Role.GERENTE,
+            ativo=True
+        )
+        db.add(usuario)
+        await db.commit()
 
-    return criar_access_token(
-        usuario_id=uuid7(),
-        role=Role.GERENTE,
-    )
+    return criar_access_token(usuario_id=GERENTE_TESTE_ID, role=Role.GERENTE)
 
+
+# UUID fixo para a Recepcionista de testes
+RECEPCIONISTA_TESTE_ID = UUID("019ff420-0000-7000-8000-000000000002")
 
 @pytest.fixture
-def token_recepcionista():
+async def token_recepcionista(db):
+    """
+    Gera o token e garante que o usuário recepcionista fixo existe no banco 
+    de forma ultra-rápida, sem criar lixo ou lentidão.
+    """
+    usuario = await db.get(Usuario, RECEPCIONISTA_TESTE_ID)
+    if not usuario:
+        usuario = Usuario(
+            id=RECEPCIONISTA_TESTE_ID,
+            nome="Recepcionista de Teste",
+            email="recepcao.teste@oficina.com",
+            senha="hash_falso_ou_valido",
+            role=Role.RECEPCIONISTA,
+            ativo=True
+        )
+        db.add(usuario)
+        await db.commit()
 
-    return criar_access_token(
-        usuario_id=uuid7(),
-        role=Role.RECEPCIONISTA,
-    )
+    return criar_access_token(usuario_id=RECEPCIONISTA_TESTE_ID, role=Role.RECEPCIONISTA)
 
 
 @pytest.fixture

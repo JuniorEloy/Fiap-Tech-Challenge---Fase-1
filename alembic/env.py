@@ -13,7 +13,12 @@ from app.features.usuarios.models import Usuario
 from app.features.veiculos.models import Veiculo
 from app.features.estoque.models import PecaInsumo
 from app.features.servicos.models import ServicoBase
-from app.features.ordem_servico.models import OrdemServico, ItemServicoOS, ItemPecaOS, OrdemServicoStatusLog
+from app.features.ordens_servico.models import (
+    OrdemServico,
+    ItemServicoOS,
+    ItemPecaOS,
+    OrdemServicoStatusLog,
+)
 from app.features.autenticacao.models import RefreshTokenSession
 
 DATABASE_URL = (

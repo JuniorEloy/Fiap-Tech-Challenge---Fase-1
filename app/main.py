@@ -8,6 +8,7 @@ from app.features.veiculos.router import veiculo_router
 from app.features.relatorios.router import relatorio_router
 from app.features.servicos.router import servico_router
 from app.features.estoque.router import estoque_router
+from app.features.ordens_servico.router import os_router
 
 app = FastAPI(
     title="Automotive Service Integrated System",
@@ -24,3 +25,4 @@ app.include_router(veiculo_router)
 app.include_router(relatorio_router)
 app.include_router(estoque_router)
 app.include_router(servico_router)
+app.include_router(os_router)

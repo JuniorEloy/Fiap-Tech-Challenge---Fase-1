@@ -1,6 +1,6 @@
 from enum import Enum
 from uuid import UUID
-from uuid6 import uuid7
+from uuid import uuid7
 from sqlalchemy import String, Uuid, Enum as SQLEnum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.shared.models.base import Base
