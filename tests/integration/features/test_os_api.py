@@ -1212,3 +1212,217 @@ async def test_mecanico_nao_deve_conseguir_registrar_resposta_de_cliente(
         f"/ordens-servico/{uuid7()}/resposta", json=payload, headers=headers
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+def gerar_placa_valida_para_teste() -> str:
+    """Gera uma placa Mercosul válida e aleatória (formato AAA9A99) para evitar colisões."""
+    letras_aleatorias_1 = "".join(random.choices(string.ascii_uppercase, k=3))
+    numero_1 = str(random.randint(0, 9))
+    letra_aleatoria_2 = random.choice(string.ascii_uppercase)
+    numeros_finais = "".join(random.choices(string.digits, k=2))
+    return f"{letras_aleatorias_1}{numero_1}{letra_aleatoria_2}{numeros_finais}"
+
+
+async def garantir_usuario_existe_no_banco(token: str, role: str, db: AsyncSession, uid: str) -> str:
+    """Decodifica o payload do JWT, obtém o sub (UUID) e insere fisicamente na tabela usuarios se não existir."""
+    token_parts = token.split('.')
+    payload_decoded = base64.b64decode(token_parts[1] + '==').decode('utf-8')
+    payload_json = json.loads(payload_decoded)
+    user_id = payload_json['sub']
+
+    res = await db.execute(select(Usuario).where(Usuario.id == user_id))
+    user_db = res.scalar_one_or_none()
+    if not user_db:
+        new_user = Usuario(
+            id=UUID(user_id),
+            nome=f"Usuario Teste {role.capitalize()} {uid}",
+            email=f"{role.lower()}.{uid}@oficina.com",
+            role=role,
+            ativo=True
+        )
+        db.add(new_user)
+        await db.commit()
+    return user_id
+
+
+@pytest.mark.asyncio
+async def test_mecanico_deve_finalizar_os_com_sucesso(
+    async_client: AsyncClient,
+    token_recepcionista: str,
+    token_estoquista: str,
+    token_mecanico: str,
+    db: AsyncSession
+):
+    """
+    Cenário: Uma OS é aberta, diagnosticada, aprovada pelo cliente (entra em EM_EXECUCAO)
+             e o mecânico registra a conclusão do serviço técnico.
+    Resultado esperado: 200 OK, status FINALIZADA, data de conclusão gravada,
+                        leadtimes (KPIs) calculados e faturamento fechado de forma íntegra.
+    """
+    headers_recep = {"Authorization": f"Bearer {token_recepcionista}"}
+    headers_estoque = {"Authorization": f"Bearer {token_estoquista}"}
+    headers_meca = {"Authorization": f"Bearer {token_mecanico}"}
+
+    uid = str(uuid7())[:6]
+
+    # Garante usuários físicos no banco
+    await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db, uid)
+    await garantir_usuario_existe_no_banco(token_estoquista, "ESTOQUISTA", db, uid)
+    mecanico_id = await garantir_usuario_existe_no_banco(token_mecanico, "MECANICO", db, uid)
+
+    # 1. Cadastra Cliente e Veículo
+    res_cliente = await async_client.post("/clientes", json={
+        "nome": f"Danilo Executor {uid}",
+        "email": f"danilo.{uid}@gmail.com",
+        "telefone": "11933334444",
+        "cpf_cnpj": CPF().generate(),
+        "tipo_pessoa": "FISICA"
+    }, headers=headers_recep)
+    cliente_id = res_cliente.json()["id"]
+
+    res_veiculo = await async_client.post("/veiculos", json={
+        "placa": gerar_placa_valida_para_teste(),
+        "marca": "Nissan",
+        "modelo": "Versa",
+        "ano": 2021,
+        "cliente_id": cliente_id
+    }, headers=headers_recep)
+    veiculo_id = res_veiculo.json()["id"]
+
+    # 2. Cadastra Serviços e Peças no Catálogo
+    res_serv = await async_client.post("/servicos", json={
+        "nome": f"Revisão de Freios {uid}",
+        "descricao": "Troca de pastilhas e discos",
+        "preco_mao_de_obra": 180.00,
+        "duracao_estimada_minutos": 60,
+        "permite_servico_expresso": False
+    }, headers=headers_recep)
+    servico_id = res_serv.json()["id"]
+
+    res_peca = await async_client.post("/estoque", json={
+        "nome": f"Pastilhas Freio Versa {uid}",
+        "preco_custo": 40.00,
+        "preco_venda": 110.00,
+        "quantidade_inicial": 10,
+        "limite_minimo": 2
+    }, headers=headers_estoque)
+    peca_id = res_peca.json()["id"]
+
+    # 3. Abre OS e lança laudo de Diagnóstico
+    res_os = await async_client.post("/ordens-servico", json={"cliente_id": cliente_id, "veiculo_id": veiculo_id}, headers=headers_recep)
+    os_id = res_os.json()["id"]
+    visualizacao_hash = res_os.json()["visualizacao_hash"]
+
+    await async_client.put(
+        f"/ordens-servico/{os_id}/diagnostico", 
+        json={"servicos": [{"servico_id": servico_id}], "pecas": [{"peca_id": peca_id, "quantidade": 2}]}, 
+        headers=headers_meca
+    )
+
+    # 4. Cliente realiza a aprovação do orçamento (OS transiciona para EM_EXECUCAO)
+    res_aprov = await async_client.post(
+        f"/ordens-servico/publica/{visualizacao_hash}/responder",
+        json={"aprovado": True, "observacoes_cliente": "Aprovado, favor caprichar!"}
+    )
+    assert res_aprov.status_code == status.HTTP_200_OK
+    assert res_aprov.json()["status"] == "EM_EXECUCAO"
+
+    # 5. Mecânico finaliza os serviços
+    payload_finalizar = {
+        "observacoes_finais": "Serviço realizado com sucesso. Freios limpos e pastilhas trocadas."
+    }
+    response = await async_client.post(
+        f"/ordens-servico/{os_id}/finalizar",
+        json=payload_finalizar,
+        headers=headers_meca
+    )
+    
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    
+    # Asserções de estado e KPIs
+    assert body["status"] == "FINALIZADA"
+    assert body["data_conclusao"] is not None
+    assert body["leadtime_full_minutos"] >= 0
+    assert body["leadtime_ativo_minutos"] >= 0
+    
+    # Asserções de Faturamento Financeiro (Consolidado e congelado)
+    # Serviços: 1x Revisão de Freios = 180.00
+    # Peças: 2x Pastilhas de Freio (110.00 cada) = 220.00
+    # Total esperado: 180.00 + 220.00 = 400.00
+    assert body["valor_servicos"] == "180.00"
+    assert body["valor_pecas"] == "220.00"
+    assert body["valor_total"] == "400.00"
+
+
+@pytest.mark.asyncio
+async def test_recepcionista_nao_deve_conseguir_finalizar_os(
+    async_client: AsyncClient,
+    token_recepcionista: str
+):
+    """
+    Cenário: Recepcionista tenta chamar a rota de conclusão técnica de OS (violação de RBAC).
+    Resultado esperado: 403 Forbidden.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    payload = {"observacoes_finais": "Tenta finalizar"}
+
+    response = await async_client.post(
+        f"/ordens-servico/{uuid7()}/finalizar",
+        json=payload,
+        headers=headers
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_falha_ao_finalizar_os_que_nao_esta_em_execucao(
+    async_client: AsyncClient,
+    token_recepcionista: str,
+    token_mecanico: str,
+    db: AsyncSession
+):
+    """
+    Cenário: Uma OS é aberta na triagem (RECEBIDA -> EM_DIAGNOSTICO). O mecânico
+             tenta finalizá-la diretamente sem antes obter a aprovação do cliente.
+    Resultado esperado: 400 Bad Request, violando as regras da máquina de estados.
+    """
+    headers_recep = {"Authorization": f"Bearer {token_recepcionista}"}
+    headers_meca = {"Authorization": f"Bearer {token_mecanico}"}
+
+    uid = str(uuid7())[:6]
+
+    await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db, uid)
+    await garantir_usuario_existe_no_banco(token_mecanico, "MECANICO", db, uid)
+
+    # Cadastra cliente e veículo
+    res_cliente = await async_client.post("/clientes", json={
+        "nome": f"Claudio Bloqueado {uid}",
+        "email": f"claudio.bloq.{uid}@gmail.com",
+        "telefone": "11922223333",
+        "cpf_cnpj": CPF().generate(),
+        "tipo_pessoa": "FISICA"
+    }, headers=headers_recep)
+    cliente_id = res_cliente.json()["id"]
+
+    res_veiculo = await async_client.post("/veiculos", json={
+        "placa": gerar_placa_valida_para_teste(),
+        "marca": "Nissan",
+        "modelo": "March",
+        "ano": 2018,
+        "cliente_id": cliente_id
+    }, headers=headers_recep)
+    veiculo_id = res_veiculo.json()["id"]
+
+    # Abre a OS (Fica em EM_DIAGNOSTICO)
+    res_os = await async_client.post("/ordens-servico", json={"cliente_id": cliente_id, "veiculo_id": veiculo_id}, headers=headers_recep)
+    os_id = res_os.json()["id"]
+
+    # Tenta finalizar de forma ilegal (transição inválida)
+    response = await async_client.post(
+        f"/ordens-servico/{os_id}/finalizar",
+        json={"observacoes_finais": "Bypassing state machine"},
+        headers=headers_meca
+    )
+    
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Não é possível concluir uma OS que não está em execução" in response.json()["detail"]
