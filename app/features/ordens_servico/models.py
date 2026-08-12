@@ -2,12 +2,18 @@ from enum import Enum
 from datetime import datetime
 from uuid import UUID
 from typing import Optional, List
-from sqlalchemy import String, DateTime, Integer, ForeignKey, select
+from sqlalchemy import String, DateTime, Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from uuid import uuid7
 from app.shared.models.base import Base
 from decimal import Decimal
 from sqlalchemy import Numeric
+
+from app.features.estoque.models import PecaInsumo
+from app.shared.utils.clock import DateTimeProvider
+from app.features.servicos.models import ServicoBase
+
+clock = DateTimeProvider()
 
 
 class StatusOS(str, Enum):
@@ -88,7 +94,6 @@ class OrdemServico(Base):
     )
 
     # 🔒 Prevenção de IDOR: Chave secundária criptográfica e opaca gerada no check-in
-    # Enviada via WhatsApp para acesso público direto e seguro sem login pelo cliente.
     visualizacao_hash: Mapped[UUID] = mapped_column(
         nullable=False,
         default=uuid7,  
@@ -96,11 +101,11 @@ class OrdemServico(Base):
         comment="Hash criptográfico opaco utilizado para acompanhamento seguro pelo cliente sem expor o ID sequencial",
     )
 
-    # ⏱️ Timestamps Operacionais
+    # ⏱️ Timestamps Operacionais (Usando DateTimeProvider)
     data_abertura: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=clock.agora,
         comment="Data e hora do check-in/abertura da OS na oficina",
     )
     data_conclusao: Mapped[Optional[datetime]] = mapped_column(
@@ -122,7 +127,6 @@ class OrdemServico(Base):
     )
 
     # 📊 Campos de Desnormalização de Performance de Escrita (BI de Alta Performance)
-    # Permitem cálculos imediatos de médias aritméticas simples de KPIs sem pesar o banco de dados.
     tempo_espera_aprovacao_minutos: Mapped[Optional[int]] = mapped_column(
         Integer,
         nullable=True,
@@ -180,10 +184,11 @@ class OrdemServico(Base):
 
         status_anterior = self.status
         self.status = novo_status
+        agora = clock.agora()
 
         # Carimbo analítico de conclusão (Se status finalizador)
         if novo_status in [StatusOS.FINALIZADA, StatusOS.ENTREGUE, StatusOS.CANCELADA]:
-            self.data_conclusao = datetime.utcnow()
+            self.data_conclusao = agora
 
             # Cálculo desnormalizado automático de KPIs
             self.leadtime_full_minutos = int(
@@ -199,7 +204,7 @@ class OrdemServico(Base):
 
         # Carimbo analítico de notificação do cliente
         if novo_status == StatusOS.AGUARDANDO_APROVACAO:
-            self.data_notificacao_cliente = datetime.utcnow()
+            self.data_notificacao_cliente = agora
 
         # Carimbo analítico de resposta do cliente (ao sair de AGUARDANDO_APROVACAO)
         if status_anterior == StatusOS.AGUARDANDO_APROVACAO and novo_status in [
@@ -207,7 +212,7 @@ class OrdemServico(Base):
             StatusOS.CANCELADA,
             StatusOS.FINALIZADA,
         ]:
-            self.data_resposta_cliente = datetime.utcnow()
+            self.data_resposta_cliente = agora
             if self.data_notificacao_cliente:
                 self.tempo_espera_aprovacao_minutos = int(
                     (
@@ -216,12 +221,12 @@ class OrdemServico(Base):
                     / 60
                 )
 
-        # Retorna o log de transição gerado automaticamente
+        # Retorna o log de transição gerado automaticamente usando o relógio central
         return OrdemServicoStatusLog(
             ordem_servico_id=self.id,
             status_anterior=status_anterior,
             status_novo=novo_status,
-            data_transicao=datetime.utcnow(),
+            data_transicao=agora,
             operador_id=operador_id,
         )
 
@@ -229,7 +234,6 @@ class OrdemServico(Base):
 class ItemServicoOS(Base):
     """
     Entidade representando as Mãos de Obra atreladas a uma Ordem de Serviço específica.
-    Registra os preços vigentes de execução de forma estática para auditoria de faturamento.
     """
 
     __tablename__ = "os_itens_servico"
@@ -247,7 +251,7 @@ class ItemServicoOS(Base):
     preco_aplicado: Mapped[Decimal] = mapped_column(
         Numeric(10, 2),
         nullable=False,
-        comment="Preço cobrado pela mão de obra no momento da execução (preserva histórico de preços)",
+        comment="Preço cobrado pela mão de obra no momento da execução",
     )
 
     duracao_minutos: Mapped[int] = mapped_column(
@@ -259,21 +263,20 @@ class ItemServicoOS(Base):
     adicionado_em: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
-        comment="Momento em que o serviço foi acoplado à OS pelo mecânico ou recepcionista",
+        default=clock.agora,
+        comment="Momento em que o serviço foi acoplado à OS",
     )
 
     # Relacionamentos ORM
     ordem_servico: Mapped["OrdemServico"] = relationship(
         "OrdemServico", back_populates="itens_servico"
     )
-    servico_base: Mapped["ServicoBase"] = relationship("ServicoBase", lazy="joined")
+    servico_base: Mapped[ServicoBase] = relationship("ServicoBase", lazy="joined")
 
 
 class ItemPecaOS(Base):
     """
     Entidade representando as Peças de Reposição alocadas na Ordem de Serviço.
-    Controla quantidades consumidas e congela o preço de custo/venda histórico.
     """
 
     __tablename__ = "os_itens_peca"
@@ -291,30 +294,30 @@ class ItemPecaOS(Base):
     quantidade: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
-        comment="Quantidade física demandada do estoque para o carro",
+        comment="Quantidade física demandada do estoque",
     )
 
     preco_unitario_aplicado: Mapped[Decimal] = mapped_column(
         Numeric(10, 2),
         nullable=False,
-        comment="Preço de venda unitário congelado no momento de fechamento do orçamento",
+        comment="Preço de venda unitário congelado no momento do orçamento",
     )
 
     adicionado_em: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.utcnow
+        DateTime, nullable=False, default=clock.agora
     )
 
     # Relacionamentos ORM
     ordem_servico: Mapped["OrdemServico"] = relationship(
         "OrdemServico", back_populates="itens_peca"
     )
-    # peca: Mapped["Peca"] = relationship("Peca", lazy="joined")  # Referenciando a tabela de peças existente
+
+    peca: Mapped["PecaInsumo"] = relationship("PecaInsumo", lazy="joined")
 
 
 class OrdemServicoStatusLog(Base):
     """
     Audit Log de transição física de status da Ordem de Serviço.
-    Essencial para rastreabilidade OWASP e cálculo de tempo médio de gargalos no pátio.
     """
 
     __tablename__ = "os_status_logs"
@@ -338,14 +341,14 @@ class OrdemServicoStatusLog(Base):
     data_transicao: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=clock.agora,
         comment="Timestamp preciso da transição física de estado",
     )
 
     operador_id: Mapped[UUID] = mapped_column(
         ForeignKey("usuarios.id", ondelete="RESTRICT"),
         nullable=False,
-        comment="Referência ao operador autenticado (Mecânico/Recepcionista/Gerente) que executou o comando",
+        comment="Referência ao operador autenticado",
     )
 
     # Relacionamentos ORM
