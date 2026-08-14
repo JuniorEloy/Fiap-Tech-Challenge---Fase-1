@@ -42,8 +42,22 @@ class RefreshHandler:
         result = await self.db.execute(stmt)
         sessao = result.scalar_one_or_none()
 
+        if not sessao:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=MSG_SESSAO_INVALIDA,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        agora = self.clock.agora()
+        agora_naive = agora.replace(tzinfo=None) if agora.tzinfo else agora
+        
+        limite_tempo = sessao.expira_em if sessao.expira_em else agora_naive
+        limite_naive = limite_tempo.replace(tzinfo=None) if limite_tempo.tzinfo else limite_tempo
+
+
         # Sessão Inexistente ou Expirada pelo Tempo
-        if not sessao or sessao.expira_em < self.clock.agora():
+        if not sessao or limite_naive < agora_naive:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=MSG_SESSAO_INVALIDA,
@@ -56,11 +70,12 @@ class RefreshHandler:
             criado_em = getattr(
                 sessao, "created_at", getattr(sessao, "data_criacao", None)
             )
+            criado_em_naive = criado_em.replace(tzinfo=None) if criado_em.tzinfo else criado_em
 
             # Tolerância padrão de 10 segundos para concorrência de rede do front-end (Grace Period)
             fora_da_janela = True
             if criado_em:
-                tempo_decorrido = self.clock.agora() - criado_em
+                tempo_decorrido = self.clock.agora() - criado_em_naive
                 fora_da_janela = tempo_decorrido > timedelta(seconds=10)
 
             if fora_da_janela:
@@ -91,7 +106,7 @@ class RefreshHandler:
                 )
 
         # Validação de integridade da sessão
-        if not sessao or sessao.revogado or sessao.expira_em < self.clock.agora():
+        if not sessao or sessao.revogado or limite_naive < agora_naive:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=MSG_SESSAO_INVALIDA,
@@ -113,14 +128,11 @@ class RefreshHandler:
         sessao.revogado = True
 
         # 5. Gera novos tokens rotacionados
-        novo_refresh_bruto = criar_refresh_token_bruto()
-        novo_token_hash = gerar_hash_token(novo_refresh_bruto)
+        novo_refresh_bruto, novo_token_hash = criar_refresh_token_bruto()
 
-        # Configura tempo de expiração do novo refresh (ex: 8 horas)
         tempo_vida_refresh = timedelta(hours=8)
         exp_refresh = self.clock.agora() + tempo_vida_refresh
 
-        # Cria nova sessão ativa no banco
         nova_sessao = RefreshTokenSession(
             usuario_id=usuario.id,
             token_hash=novo_token_hash,
@@ -131,10 +143,10 @@ class RefreshHandler:
 
         # Gera novo access token temporário
         tempo_vida_access = getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 15)
+
         novo_access_token = criar_access_token(
             usuario_id=usuario.id,
             role=usuario.role,
-            expires_delta=timedelta(minutes=tempo_vida_access),
         )
 
         # Salva as mudanças de forma atômica

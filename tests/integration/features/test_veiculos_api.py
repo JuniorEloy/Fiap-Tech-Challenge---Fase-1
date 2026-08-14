@@ -2,7 +2,20 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 from uuid import uuid7
+from app.shared.utils.clock import DateTimeProvider
+from validate_docbr import CPF
+import random
+import string
 
+clock = DateTimeProvider()
+
+def gerar_placa_valida_para_teste() -> str:
+    """Gera uma placa Mercosul válida e aleatória (formato AAA9A99) para evitar colisões cadastrais."""
+    letras_aleatorias_1 = "".join(random.choices(string.ascii_uppercase, k=3))
+    numero_1 = str(random.randint(0, 9))
+    letra_aleatoria_2 = random.choice(string.ascii_uppercase)
+    numeros_finais = "".join(random.choices(string.digits, k=2))
+    return f"{letras_aleatorias_1}{numero_1}{letra_aleatoria_2}{numeros_finais}"
 
 @pytest.mark.asyncio
 async def test_cadastrar_veiculo_tradicional_com_sucesso(
@@ -198,6 +211,15 @@ async def test_consultar_veiculo_com_placa_invalida_deve_retornar_422(
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
+def gerar_placa_valida_para_teste() -> str:
+    """Gera uma placa Mercosul válida e aleatória (formato AAA9A99) para evitar colisões cadastrais."""
+    letras_aleatorias_1 = "".join(random.choices(string.ascii_uppercase, k=3))
+    numero_1 = str(random.randint(0, 9))
+    letra_aleatoria_2 = random.choice(string.ascii_uppercase)
+    numeros_finais = "".join(random.choices(string.digits, k=2))
+    return f"{letras_aleatorias_1}{numero_1}{letra_aleatoria_2}{numeros_finais}"
+
+
 @pytest.mark.asyncio
 async def test_editar_veiculo_com_sucesso(
     async_client: AsyncClient, token_recepcionista: str
@@ -207,32 +229,30 @@ async def test_editar_veiculo_com_sucesso(
     Resultado esperado: 200 OK com os dados atualizados.
     """
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    uid = str(uuid7())[:6]
 
     # 1. Cria um cliente primeiro para associar ao carro de teste
     payload_cliente = {
-        "nome": "Thiago Edicao Veiculos",
-        "email": "thiago.edicao@oficina.com",
+        "nome": f"Thiago Edicao Veiculos {uid}",
+        "email": f"thiago.edicao.{uid}@oficina.com",
         "telefone": "11988887777",
-        "cpf_cnpj": "52998224725",  # CPF Válido
-        "tipo_pessoa": "FISICA",
+        "cpf_cnpj": CPF().generate(),  # CPF Dinâmico
+        "tipo_pessoa": "FISICA"
     }
-    res_cliente = await async_client.post(
-        "/clientes", json=payload_cliente, headers=headers
-    )
+    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
     assert res_cliente.status_code == status.HTTP_201_CREATED
     cliente_id = res_cliente.json()["id"]
 
     # 2. Cria o veículo original
+    placa_original = gerar_placa_valida_para_teste()
     payload_veiculo = {
-        "placa": "efg5h67",
+        "placa": placa_original,
         "marca": "Chevrolet",
         "modelo": "Celta",
         "ano": 2012,
-        "cliente_id": cliente_id,
+        "cliente_id": cliente_id
     }
-    res_veiculo = await async_client.post(
-        "/veiculos", json=payload_veiculo, headers=headers
-    )
+    res_veiculo = await async_client.post("/veiculos", json=payload_veiculo, headers=headers)
     assert res_veiculo.status_code == status.HTTP_201_CREATED
     veiculo_id = res_veiculo.json()["id"]
 
@@ -240,11 +260,9 @@ async def test_editar_veiculo_com_sucesso(
     payload_edicao = {
         "marca": "Chevrolet Editado",
         "modelo": "Celta Editado",
-        "ano": 2013,
+        "ano": 2013
     }
-    response = await async_client.put(
-        f"/veiculos/{veiculo_id}", json=payload_edicao, headers=headers
-    )
+    response = await async_client.put(f"/veiculos/{veiculo_id}", json=payload_edicao, headers=headers)
 
     # 4. Asserções de alteração bem sucedida
     assert response.status_code == status.HTTP_200_OK
@@ -252,7 +270,7 @@ async def test_editar_veiculo_com_sucesso(
     assert body["marca"] == "Chevrolet Editado"
     assert body["modelo"] == "Celta Editado"
     assert body["ano"] == 2013
-    assert body["placa"] == "EFG5H67"  # Mantida a original formatada pelo VO
+    assert body["placa"] == placa_original.upper()  # Mantida a original formatada pelo VO
     assert body["cliente_id"] == cliente_id
 
 
@@ -265,58 +283,51 @@ async def test_editar_veiculo_placa_duplicada_deve_retornar_409(
     Resultado esperado: 409 Conflict.
     """
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    uid = str(uuid7())[:6]
 
-    # 1. Cria o cliente de teste
+    # 1. Cria o cliente de teste com CPF único
     payload_cliente = {
-        "nome": "Marcia Duplicidade Placa",
-        "email": "marcia.duplicidade@oficina.com",
+        "nome": f"Marcia Duplicidade Placa {uid}",
+        "email": f"marcia.duplicidade.{uid}@oficina.com",
         "telefone": "11977776666",
-        "cpf_cnpj": "28604316086",  # CPF Válido
-        "tipo_pessoa": "FISICA",
+        "cpf_cnpj": CPF().generate(),  # CPF Único
+        "tipo_pessoa": "FISICA"
     }
-    res_cliente = await async_client.post(
-        "/clientes", json=payload_cliente, headers=headers
-    )
+    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
     assert res_cliente.status_code == status.HTTP_201_CREATED
     cliente_id = res_cliente.json()["id"]
 
-    # 2. Cria veículo A (placa AAA-1111)
-    await async_client.post(
-        "/veiculos",
-        json={
-            "placa": "aaa1111",
-            "marca": "VW",
-            "modelo": "Gol",
-            "ano": 2010,
-            "cliente_id": cliente_id,
-        },
-        headers=headers,
-    )
+    # Generates two unique plates
+    placa_a = gerar_placa_valida_para_teste()
+    placa_b = gerar_placa_valida_para_teste()
 
-    # 3. Cria veículo B (placa BBB-2222)
-    res_veiculo_b = await async_client.post(
-        "/veiculos",
-        json={
-            "placa": "bbb2222",
-            "marca": "Fiat",
-            "modelo": "Uno",
-            "ano": 2011,
-            "cliente_id": cliente_id,
-        },
-        headers=headers,
-    )
+    # 2. Cria veículo A
+    await async_client.post("/veiculos", json={
+        "placa": placa_a,
+        "marca": "VW",
+        "modelo": "Gol",
+        "ano": 2010,
+        "cliente_id": cliente_id
+    }, headers=headers)
+
+    # 3. Cria veículo B
+    res_veiculo_b = await async_client.post("/veiculos", json={
+        "placa": placa_b,
+        "marca": "Fiat",
+        "modelo": "Uno",
+        "ano": 2011,
+        "cliente_id": cliente_id
+    }, headers=headers)
     veiculo_b_id = res_veiculo_b.json()["id"]
 
-    # 4. Tenta atualizar a placa do veículo B para AAA-1111 (já registrada no veículo A)
-    response = await async_client.put(
-        f"/veiculos/{veiculo_b_id}", json={"placa": "aaa-1111"}, headers=headers
-    )
+    # 4. Tenta atualizar a placa do veículo B para o valor da placa A (já registrada no veículo A)
+    response = await async_client.put(f"/veiculos/{veiculo_b_id}", json={
+        "placa": placa_a
+    }, headers=headers)
 
     # 5. Valida bloqueio de duplicidade
     assert response.status_code == status.HTTP_409_CONFLICT
-    assert (
-        response.json()["detail"] == "Já existe um veículo cadastrado com esta placa."
-    )
+    assert response.json()["detail"] == "Já existe um veículo cadastrado com esta placa."
 
 
 @pytest.mark.asyncio
@@ -330,7 +341,309 @@ async def test_mecanico_nao_deve_ter_permissao_de_editar_veiculo(
     headers = {"Authorization": f"Bearer {token_mecanico}"}
     payload = {"marca": "Ferrari"}
 
-    response = await async_client.put(
-        f"/veiculos/{uuid7()}", json=payload, headers=headers
-    )
+    response = await async_client.put(f"/veiculos/{uuid7()}", json=payload, headers=headers)
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_estoquista_nao_deve_ter_permissao_de_editar_veiculo(
+    async_client: AsyncClient, token_estoquista: str
+):
+    """
+    Cenário: Estoquista tenta acessar a rota de edição de veículos.
+    Resultado esperado: 403 Forbidden (RBAC operando).
+    """
+    headers = {"Authorization": f"Bearer {token_estoquista}"}
+    payload = {"marca": "Lamborghini"}
+
+    response = await async_client.put(f"/veiculos/{uuid7()}", json=payload, headers=headers)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_usuario_nao_autenticado_deve_receber_401_ao_editar_veiculo(
+    async_client: AsyncClient
+):
+    """
+    Cenário: Chamada de edição de veículos sem autenticação.
+    Resultado esperado: 401 Unauthorized.
+    """
+    payload = {"marca": "Porsche"}
+    response = await async_client.put(f"/veiculos/{uuid7()}", json=payload)
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+# --- NOVOS TESTES ADICIONADOS PARA SUBIR A COBERTURA DO SCHEMA PARA >90% ---
+
+@pytest.mark.asyncio
+async def test_editar_veiculo_schema_placa_invalida_deve_retornar_422(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Tenta editar um veículo passando uma placa fora dos formatos aceitáveis (Tradicional ou Mercosul).
+    Resultado esperado: 422 Unprocessable Entity (Erro de validação do Pydantic).
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+
+    # Executa a chamada com placa inválida
+    payload_edicao = {"placa": "placa-invalida-longa"}
+    response = await async_client.put(f"/veiculos/{uuid7()}", json=payload_edicao, headers=headers)
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.asyncio
+async def test_editar_veiculo_schema_ano_invalido_baixo_deve_retornar_422(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Tenta editar o veículo com ano menor que 1900.
+    Resultado esperado: 422 Unprocessable Entity.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+
+    payload_edicao = {"ano": 1899}
+    response = await async_client.put(f"/veiculos/{uuid7()}", json=payload_edicao, headers=headers)
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.asyncio
+async def test_editar_veiculo_schema_ano_invalido_alto_deve_retornar_422(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Tenta editar o veículo com ano superior a ano_atual + 1.
+    Resultado esperado: 422 Unprocessable Entity.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    ano_limite = clock.agora().year + 2
+
+    payload_edicao = {"ano": ano_limite}
+    response = await async_client.put(f"/veiculos/{uuid7()}", json=payload_edicao, headers=headers)
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.asyncio
+async def test_editar_veiculo_schema_valores_nulos_deve_funcionar_e_preservar_originais(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Tenta editar o veículo passando valores nulos (opcionais) no payload para validar se o Pydantic
+             e o Handler tratam os campos opcionais sem falhar e sem alterar os valores já existentes.
+    Resultado esperado: 200 OK mantendo os valores originais intactos.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    uid = str(uuid7())[:6]
+
+    # 1. Cria o cliente e o veículo
+    payload_cliente = {
+        "nome": f"Carla Preservacao {uid}",
+        "email": f"carla.preservacao.{uid}@oficina.com",
+        "telefone": "11933334444",
+        "cpf_cnpj": CPF().generate(),  # CPF Único e dinâmico para evitar colisão!
+        "tipo_pessoa": "FISICA"
+    }
+    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    assert res_cliente.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cliente.json()["id"]
+
+    placa_original = gerar_placa_valida_para_teste()
+    res_veiculo = await async_client.post("/veiculos", json={
+        "placa": placa_original,
+        "marca": "Toyota",
+        "modelo": "Corolla",
+        "ano": 2020,
+        "cliente_id": cliente_id
+    }, headers=headers)
+    assert res_veiculo.status_code == status.HTTP_201_CREATED
+    veiculo_id = res_veiculo.json()["id"]
+
+    # 2. Executa a edição enviando um payload em que os campos placa e ano são None (nulos)
+    payload_edicao = {
+        "placa": None,
+        "marca": "Toyota Editado",
+        "modelo": "Corolla Editado",
+        "ano": None,
+        "cliente_id": None
+    }
+    response = await async_client.put(f"/veiculos/{veiculo_id}", json=payload_edicao, headers=headers)
+    assert response.status_code == status.HTTP_200_OK
+
+    body = response.json()
+    assert body["marca"] == "Toyota Editado"
+    assert body["modelo"] == "Corolla Editado"
+    # Campos que foram None no payload devem permanecer com os valores originais criados no passo 1
+    assert body["placa"] == placa_original.upper()  # Mantém valor original formatado
+    assert body["ano"] == 2020
+    assert body["cliente_id"] == cliente_id
+
+
+# --- NOVOS TESTES ADICIONADOS PARA SUBIR A COBERTURA DO HANDLER PARA >90% ---
+
+@pytest.mark.asyncio
+async def test_editar_veiculo_inexistente_deve_retornar_404(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Tenta editar um veículo utilizando um ID aleatório que não existe no banco de dados.
+    Resultado esperado: 404 Not Found.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    payload_edicao = {
+        "marca": "VW",
+        "modelo": "Fusca",
+        "ano": 1970
+    }
+    id_fake = str(uuid7())
+    response = await async_client.put(f"/veiculos/{id_fake}", json=payload_edicao, headers=headers)
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Veículo não encontrado."
+
+
+@pytest.mark.asyncio
+async def test_editar_veiculo_novo_proprietario_inexistente_deve_retornar_404(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Tenta transferir o veículo para um cliente que não está cadastrado no sistema.
+    Resultado esperado: 404 Not Found.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    uid = str(uuid7())[:6]
+
+    # 1. Cria o cliente e o veículo originais
+    payload_cliente = {
+        "nome": f"Thiago Original {uid}",
+        "email": f"thiago.original.{uid}@oficina.com",
+        "telefone": "11988887771",
+        "cpf_cnpj": CPF().generate(),  # CPF Único
+        "tipo_pessoa": "FISICA"
+    }
+    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    assert res_cliente.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cliente.json()["id"]
+
+    placa_original = gerar_placa_valida_para_teste()
+    res_veiculo = await async_client.post("/veiculos", json={
+        "placa": placa_original,
+        "marca": "Ford",
+        "modelo": "Ka",
+        "ano": 2015,
+        "cliente_id": cliente_id
+    }, headers=headers)
+    assert res_veiculo.status_code == status.HTTP_201_CREATED
+    veiculo_id = res_veiculo.json()["id"]
+
+    # 2. Tenta editar o veículo enviando um cliente_id inexistente (fake)
+    cliente_id_fake = str(uuid7())
+    payload_edicao = {
+        "cliente_id": cliente_id_fake
+    }
+    response = await async_client.put(f"/veiculos/{veiculo_id}", json=payload_edicao, headers=headers)
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Cliente proprietário não cadastrado."
+
+
+@pytest.mark.asyncio
+async def test_editar_veiculo_transferencia_proprietario_com_sucesso(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Transfere a propriedade de um veículo existente de um Cliente A para um Cliente B já cadastrado.
+    Resultado esperado: 200 OK contendo o ID do novo proprietário.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    uid = str(uuid7())[:6]
+
+    # 1. Cadastra Cliente A com CPF Único
+    res_cliente_a = await async_client.post("/clientes", json={
+        "nome": f"Cliente A {uid}",
+        "email": f"cliente.a.{uid}@oficina.com",
+        "telefone": "11988889999",
+        "cpf_cnpj": CPF().generate(),  # CPF Único
+        "tipo_pessoa": "FISICA"
+    }, headers=headers)
+    assert res_cliente_a.status_code == status.HTTP_201_CREATED
+    cliente_a_id = res_cliente_a.json()["id"]
+
+    # 2. Cadastra Cliente B com CPF Único
+    res_cliente_b = await async_client.post("/clientes", json={
+        "nome": f"Cliente B {uid}",
+        "email": f"cliente.b.{uid}@oficina.com",
+        "telefone": "11988889998",
+        "cpf_cnpj": CPF().generate(),  # CPF Único
+        "tipo_pessoa": "FISICA"
+    }, headers=headers)
+    assert res_cliente_b.status_code == status.HTTP_201_CREATED
+    cliente_b_id = res_cliente_b.json()["id"]
+
+    # 3. Cadastra veículo com o proprietário A
+    placa_original = gerar_placa_valida_para_teste()
+    res_veiculo = await async_client.post("/veiculos", json={
+        "placa": placa_original,
+        "marca": "Fiat",
+        "modelo": "Palio",
+        "ano": 2010,
+        "cliente_id": cliente_a_id
+    }, headers=headers)
+    assert res_veiculo.status_code == status.HTTP_201_CREATED
+    veiculo_id = res_veiculo.json()["id"]
+
+    # 4. Transfere a propriedade para o Cliente B
+    payload_edicao = {
+        "cliente_id": cliente_b_id
+    }
+    response = await async_client.put(f"/veiculos/{veiculo_id}", json=payload_edicao, headers=headers)
+    
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["cliente_id"] == cliente_b_id
+
+
+@pytest.mark.asyncio
+async def test_editar_veiculo_mesma_placa_nao_deve_gerar_conflito(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    """
+    Cenário: Edita um veículo enviando o mesmo valor de placa que ele já possui.
+             Isso valida a integridade do Handler que deve ignorar a checagem de duplicidade se a placa não mudou.
+    Resultado esperado: 200 OK sem conflito.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    uid = str(uuid7())[:6]
+
+    # 1. Cria o cliente e o veículo
+    payload_cliente = {
+        "nome": f"Daniel Placa {uid}",
+        "email": f"daniel.placa.{uid}@oficina.com",
+        "telefone": "11944445555",
+        "cpf_cnpj": CPF().generate(),  # CPF Único
+        "tipo_pessoa": "FISICA"
+    }
+    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    assert res_cliente.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cliente.json()["id"]
+
+    placa_original = gerar_placa_valida_para_teste()
+    res_veiculo = await async_client.post("/veiculos", json={
+        "placa": placa_original,
+        "marca": "Hyundai",
+        "modelo": "HB20",
+        "ano": 2018,
+        "cliente_id": cliente_id
+    }, headers=headers)
+    assert res_veiculo.status_code == status.HTTP_201_CREATED
+    veiculo_id = res_veiculo.json()["id"]
+
+    # 2. Edita o veículo enviando a mesma placa (mesmo que com formatação diferente)
+    payload_edicao = {
+        "placa": placa_original.lower(),
+        "modelo": "HB20 Editado"
+    }
+    response = await async_client.put(f"/veiculos/{veiculo_id}", json=payload_edicao, headers=headers)
+    
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["placa"] == placa_original.upper()  # Mantém a mesma placa limpa e formatada
+    assert body["modelo"] == "HB20 Editado"

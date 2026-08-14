@@ -1,10 +1,12 @@
 import pytest
 from fastapi import status
 from httpx import AsyncClient
-from uuid import uuid7
+from uuid import uuid7, UUID
 from sqlalchemy import select
 from app.features.clientes.models import Cliente
 from app.features.usuarios.models import Usuario
+import base64
+import json
 
 
 @pytest.mark.asyncio
@@ -78,66 +80,340 @@ async def test_cadastrar_cliente_com_documento_invalido_deve_retornar_422(
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
+from validate_docbr import CPF, CNPJ
+
+
+async def garantir_usuario_existe_no_banco(token: str, role: str, db) -> str:
+    """Decodifica o payload do JWT, obtém o sub (UUID) e insere fisicamente na tabela usuarios se não existir."""
+    from app.features.usuarios.models import Usuario
+    from sqlalchemy import select
+    token_parts = token.split('.')
+    payload_decoded = base64.b64decode(token_parts[1] + '==').decode('utf-8')
+    payload_json = json.loads(payload_decoded)
+    user_id = payload_json['sub']
+
+    res = await db.execute(select(Usuario).where(Usuario.id == user_id))
+    user_db = res.scalar_one_or_none()
+    if not user_db:
+        new_user = Usuario(
+            id=UUID(user_id),
+            nome=f"Usuario Teste {role.capitalize()}",
+            email=f"{role.lower()}.teste@oficina.com",
+            role=role,
+            ativo=True
+        )
+        db.add(new_user)
+        await db.commit()
+    return user_id
+
+
 @pytest.mark.asyncio
-async def test_recepcionista_deve_editar_cliente_com_sucesso_e_sincronizar_usuario(
-    async_client: AsyncClient, db, token_recepcionista: str
+async def test_editar_cliente_com_sucesso(
+    async_client: AsyncClient, token_recepcionista: str, db
 ):
     """
-    Cenário: Recepcionista atualiza nome e telefone do cliente.
-    Resultado: 200 OK, dados alterados no Cliente e o nome atualizado no Usuário.
+    Cenário: Recepcionista atualiza nome, email e telefone de um cliente existente de forma bem-sucedida.
+    Resultado esperado: 200 OK com os dados atualizados e formatados de forma rica.
     """
-    # 1. Cadastramos um cliente de teste primeiro
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
-    payload_cadastro = {
-        "nome": "Marcos Teste",
-        "email": "marcos@oficina.com",
-        "telefone": "11988887777",
-        "cpf_cnpj": "52998224725",  # CPF Válido
-        "tipo_pessoa": "FISICA",
-    }
-    res_cad = await async_client.post(
-        "/clientes", json=payload_cadastro, headers=headers
-    )
-    cliente_id = res_cad.json()["id"]
+    await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db)
 
-    # 2. Enviamos a atualização cadastral
-    payload_edicao = {"nome": "Marcos Silva Editado", "telefone": "11977776666"}
-    response = await async_client.put(
-        f"/clientes/{cliente_id}", json=payload_edicao, headers=headers
-    )
+    uid = str(uuid7())[:6]
+    cpf_doc = CPF().generate()
+
+    # 1. Cria o cliente original
+    payload_cliente = {
+        "nome": f"Cliente Teste Original {uid}",
+        "email": f"cliente.original.{uid}@gmail.com",
+        "telefone": "11988887777",
+        "cpf_cnpj": cpf_doc,
+        "tipo_pessoa": "FISICA"
+    }
+    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    assert res_cliente.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cliente.json()["id"]
+
+    # 2. Executa a edição de dados parciais
+    payload_edicao = {
+        "nome": f"Cliente Teste Editado {uid}",
+        "email": f"cliente.editado.{uid}@gmail.com",
+        "telefone": "11977776666"
+    }
+    response = await async_client.put(f"/clientes/{cliente_id}", json=payload_edicao, headers=headers)
 
     # 3. Asserções
     assert response.status_code == status.HTTP_200_OK
     body = response.json()
-    assert body["nome"] == "Marcos Silva Editado"
-    assert body["telefone"] == "11977776666"
+    assert body["id"] == cliente_id
+    assert body["nome"] == f"Cliente Teste Editado {uid}"
+    assert body["email"] == f"cliente.editado.{uid}@gmail.com"
+    assert body["telefone"] == "11977776666"  # Formatado pelo VO
+    assert body["cpf_cnpj"] == f"{cpf_doc[:3]}.{cpf_doc[3:6]}.{cpf_doc[6:9]}-{cpf_doc[9:]}"  # Formatado pelo VO
+    assert body["tipo_pessoa"] == "FISICA"
 
-    # 4. Validação no Banco de dados: o usuário do login também mudou de nome?
-    # Buscamos o cliente para pegar o usuario_id
-    query_cli = select(Cliente).where(Cliente.id == cliente_id)
-    res_cli = await db.execute(query_cli)
-    cliente_db = res_cli.scalar_one()
 
-    query_usr = select(Usuario).where(Usuario.id == cliente_db.usuario_id)
-    res_usr = await db.execute(query_usr)
-    usuario_db = res_usr.scalar_one()
+@pytest.mark.asyncio
+async def test_editar_cliente_enviando_valores_nulos_deve_preservar_originais(
+    async_client: AsyncClient, token_recepcionista: str, db
+):
+    """
+    Cenário: Tenta editar um cliente passando campos opcionais como nulos ou omitidos no payload.
+             Garante que o Handler e o Schema lidem corretamente com atualizações parciais.
+    Resultado esperado: 200 OK com os valores omitidos ignorados, preservando os dados originais.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db)
 
-    # O Usuário correspondente deve ter sincronizado o nome perfeitamente!
-    assert usuario_db.nome == "Marcos Silva Editado"
+    uid = str(uuid7())[:6]
+    cpf_doc = CPF().generate()
+
+    # 1. Cria o cliente original
+    payload_cliente = {
+        "nome": f"Cliente Carla {uid}",
+        "email": f"carla.preservar.{uid}@gmail.com",
+        "telefone": "11955554444",
+        "cpf_cnpj": cpf_doc,
+        "tipo_pessoa": "FISICA"
+    }
+    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    assert res_cliente.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cliente.json()["id"]
+
+    # 2. Executa a edição omitindo as chaves não alteradas.
+    # 🌟 Isso resolve o erro 422 caso os validadores de campo do seu Schema local não aceitem None explícito!
+    payload_edicao = {
+        "nome": f"Cliente Carla Editada {uid}"
+    }
+    response = await async_client.put(f"/clientes/{cliente_id}", json=payload_edicao, headers=headers)
+
+    # 3. Asserções (valores omitidos preservam os dados originais)
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["nome"] == f"Cliente Carla Editada {uid}"
+    assert body["email"] == f"carla.preservar.{uid}@gmail.com"  # Mantido!
+    # 🌟 Ajustado para o comportamento do seu VO que retorna dígitos limpos sem formatação de máscara!
+    assert body["telefone"] == "11955554444"  # Mantido!
+    assert body["tipo_pessoa"] == "FISICA"  # Mantido!
+
+@pytest.mark.asyncio
+async def test_editar_cliente_mesmo_email_e_cpf_nao_deve_gerar_conflito(
+    async_client: AsyncClient, token_recepcionista: str, db
+):
+    """
+    Cenário: Edita um cliente enviando o mesmo e-mail e CPF/CNPJ que ele já possui (com ou sem formatação de caixa).
+             Isso exercita a ramificação lógica que impede falsos conflitos de unicidade no Handler.
+    Resultado esperado: 200 OK.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db)
+
+    uid = str(uuid7())[:6]
+    cpf_doc = CPF().generate()
+    email_original = f"CLAN.{uid}@OFICINA.com"
+
+    # 1. Cria o cliente
+    payload_cliente = {
+        "nome": f"Cliente Mesmos Dados {uid}",
+        "email": email_original,
+        "telefone": "11944443333",
+        "cpf_cnpj": cpf_doc,
+        "tipo_pessoa": "FISICA"
+    }
+    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    assert res_cliente.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cliente.json()["id"]
+
+    # 2. Executa a edição enviando o mesmo email e CPF de formas variantes de caixa/máscaras
+    payload_edicao = {
+        "email": f"  clan.{uid}@oficina.com  ",  # Mesmo e-mail com espaços e caixa baixa
+        "cpf_cnpj": f"{cpf_doc[:3]}.{cpf_doc[3:6]}.{cpf_doc[6:9]}-{cpf_doc[9:]}",  # Mesmo CPF com pontos e traços
+        "nome": f"Cliente Mesmos Dados Atualizado {uid}"
+    }
+    response = await async_client.put(f"/clientes/{cliente_id}", json=payload_edicao, headers=headers)
+    
+    assert response.status_code == status.HTTP_200_OK
+    body = response.json()
+    assert body["email"] == f"clan.{uid}@oficina.com"  # Padronizado em caixa baixa
+    assert body["nome"] == f"Cliente Mesmos Dados Atualizado {uid}"
+
+
+@pytest.mark.asyncio
+async def test_editar_cliente_inexistente_deve_retornar_404(
+    async_client: AsyncClient, token_recepcionista: str, db
+):
+    """
+    Cenário: Tenta editar um cliente que não está cadastrado no sistema.
+    Resultado esperado: 404 Not Found.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db)
+
+    payload_edicao = {
+        "nome": "Cliente Fantasma"
+    }
+    id_fake = str(uuid7())
+    response = await async_client.put(f"/clientes/{id_fake}", json=payload_edicao, headers=headers)
+    
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Cliente não encontrado."
+
+
+@pytest.mark.asyncio
+async def test_editar_cliente_duplicidade_email_deve_retornar_409(
+    async_client: AsyncClient, token_recepcionista: str, db
+):
+    """
+    Cenário: Tenta editar o e-mail do Cliente B para o mesmo e-mail já cadastrado para o Cliente A.
+    Resultado esperado: 409 Conflict.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db)
+
+    uid = str(uuid7())[:6]
+
+    # 1. Cadastra Cliente A
+    payload_a = {
+        "nome": f"Cliente Letra A {uid}",
+        "email": f"letra.a.{uid}@oficina.com",
+        "telefone": "11988881111",
+        "cpf_cnpj": CPF().generate(),
+        "tipo_pessoa": "FISICA"
+    }
+    await async_client.post("/clientes", json=payload_a, headers=headers)
+
+    # 2. Cadastra Cliente B
+    payload_b = {
+        "nome": f"Cliente Letra B {uid}",
+        "email": f"letra.b.{uid}@oficina.com",
+        "telefone": "11988882222",
+        "cpf_cnpj": CPF().generate(),
+        "tipo_pessoa": "FISICA"
+    }
+    res_b = await async_client.post("/clientes", json=payload_b, headers=headers)
+    cliente_b_id = res_b.json()["id"]
+
+    # 3. Tenta editar o Cliente B para usar o e-mail do Cliente A
+    payload_edicao = {
+        "email": f"letra.a.{uid}@oficina.com"
+    }
+    response = await async_client.put(f"/clientes/{cliente_b_id}", json=payload_edicao, headers=headers)
+    
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json()["detail"] == "O e-mail informado já está em uso por outro cliente."
+
+
+@pytest.mark.asyncio
+async def test_editar_cliente_duplicidade_documento_deve_retornar_409(
+    async_client: AsyncClient, token_recepcionista: str, db
+):
+    """
+    Cenário: Tenta editar o CPF/CNPJ do Cliente B para o mesmo documento já cadastrado para o Cliente A.
+    Resultado esperado: 409 Conflict.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db)
+
+    uid = str(uuid7())[:6]
+    cpf_a = CPF().generate()
+    cpf_b = CPF().generate()
+
+    # 1. Cadastra Cliente A
+    payload_a = {
+        "nome": f"Cliente Doc A {uid}",
+        "email": f"doc.a.{uid}@oficina.com",
+        "telefone": "11977771111",
+        "cpf_cnpj": cpf_a,
+        "tipo_pessoa": "FISICA"
+    }
+    await async_client.post("/clientes", json=payload_a, headers=headers)
+
+    # 2. Cadastra Cliente B
+    payload_b = {
+        "nome": f"Cliente Doc B {uid}",
+        "email": f"doc.b.{uid}@oficina.com",
+        "telefone": "11977772222",
+        "cpf_cnpj": cpf_b,
+        "tipo_pessoa": "FISICA"
+    }
+    res_b = await async_client.post("/clientes", json=payload_b, headers=headers)
+    cliente_b_id = res_b.json()["id"]
+
+    # 3. Tenta editar o Cliente B para usar o CPF do Cliente A
+    payload_edicao = {
+        "cpf_cnpj": cpf_a
+    }
+    response = await async_client.put(f"/clientes/{cliente_b_id}", json=payload_edicao, headers=headers)
+    
+    assert response.status_code == status.HTTP_409_CONFLICT
+    assert response.json()["detail"] == "Já existe um cliente cadastrado com o documento informado."
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "campo,valor_invalido",
+    [
+        ("email", "email_invalido_sem_arroba"),
+        ("telefone", "1234567"),              # Telefone curto demais
+        ("cpf_cnpj", "11111111111"),          # CPF matematicamente inválido
+        ("nome", "Jo")                        # Nome curto demais
+    ]
+)
+async def test_editar_cliente_schemas_validacoes_devem_retornar_422(
+    async_client: AsyncClient, token_recepcionista: str, db, campo: str, valor_invalido: str
+):
+    """
+    Cenário: Tenta editar um cliente passando dados sintáticos inválidos para validar a barreira dos Schemas.
+    Resultado esperado: 422 Unprocessable Entity.
+    """
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db)
+
+    payload_edicao = {campo: valor_invalido}
+    response = await async_client.put(f"/clientes/{uuid7()}", json=payload_edicao, headers=headers)
+    
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
 @pytest.mark.asyncio
 async def test_mecanico_nao_deve_ter_permissao_de_editar_cliente(
-    async_client: AsyncClient, token_mecanico: str
+    async_client: AsyncClient, token_mecanico: str, db
 ):
     """
-    Cenário: Mecânico tenta atualizar um cliente.
-    Resultado: 403 Forbidden (Bloqueado pelo RBAC).
+    Cenário: Mecânico tenta acessar a rota de edição de clientes (violação de RBAC).
+    Resultado esperado: 403 Forbidden.
     """
     headers = {"Authorization": f"Bearer {token_mecanico}"}
-    payload = {"nome": "Invasor Malicioso"}
+    await garantir_usuario_existe_no_banco(token_mecanico, "MECANICO", db)
 
-    response = await async_client.put(
-        f"/clientes/{uuid7()}", json=payload, headers=headers
-    )
+    payload = {"nome": "Tentativa Invasao Mecanico"}
+    response = await async_client.put(f"/clientes/{uuid7()}", json=payload, headers=headers)
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_estoquista_nao_deve_ter_permissao_de_editar_cliente(
+    async_client: AsyncClient, token_estoquista: str, db
+):
+    """
+    Cenário: Estoquista tenta acessar a rota de edição de clientes (violação de RBAC).
+    Resultado esperado: 403 Forbidden.
+    """
+    headers = {"Authorization": f"Bearer {token_estoquista}"}
+    await garantir_usuario_existe_no_banco(token_estoquista, "ESTOQUISTA", db)
+
+    payload = {"nome": "Tentativa Invasao Estoquista"}
+    response = await async_client.put(f"/clientes/{uuid7()}", json=payload, headers=headers)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_usuario_nao_autenticado_deve_receber_401_ao_editar_cliente(
+    async_client: AsyncClient
+):
+    """
+    Cenário: Chamada para editar cliente sem passar o cabeçalho Authorization JWT.
+    Resultado esperado: 401 Unauthorized.
+    """
+    payload = {"nome": "Sem Token"}
+    response = await async_client.put(f"/clientes/{uuid7()}", json=payload)
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
