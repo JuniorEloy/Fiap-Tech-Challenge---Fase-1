@@ -24,8 +24,10 @@ class OrdemServicoRepository:
     async def salvar(self, os: OrdemServico) -> OrdemServico:
         """Persiste a OS na transação atual."""
         self.db.add(os)
+        await self.db.flush()  
+        await self.db.refresh(os)  
         return os
 
     async def salvar_status_log(self, log: OrdemServicoStatusLog) -> None:
-        """Persiste o log de auditoria de transição de status."""
         self.db.add(log)
+        await self.db.flush()

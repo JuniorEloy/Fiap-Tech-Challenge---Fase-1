@@ -18,7 +18,7 @@ class ResponderOrcamentoHandler:
         self.repository = OrdemServicoRepository(db)
 
     async def executar(
-        self, os_id: UUID, command: ResponderOrcamentoRequest, operador_id: UUID
+        self, os_id: UUID, command: ResponderOrcamentoRequest, operador_id: Optional[UUID] = None
     ) -> RespostaOrcamentoResponse:
         """
         Orquestra a aprovação ou rejeição da Ordem de Serviço pelo cliente:
@@ -127,6 +127,4 @@ class ResponderOrcamentoHandler:
             )
 
         # Executa o fluxo padrão usando o ID do próprio cliente como o operador que assinou
-        return await self.executar(
-            os_id=os.id, command=command, operador_id=os.cliente_id
-        )
+        return await self.executar(os_id=os.id, command=command, operador_id=None)
