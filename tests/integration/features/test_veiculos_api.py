@@ -388,7 +388,7 @@ async def test_editar_veiculo_schema_placa_invalida_deve_retornar_422(
     # Executa a chamada com placa inválida
     payload_edicao = {"placa": "placa-invalida-longa"}
     response = await async_client.put(f"/veiculos/{uuid7()}", json=payload_edicao, headers=headers)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio
@@ -403,7 +403,7 @@ async def test_editar_veiculo_schema_ano_invalido_baixo_deve_retornar_422(
 
     payload_edicao = {"ano": 1899}
     response = await async_client.put(f"/veiculos/{uuid7()}", json=payload_edicao, headers=headers)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio
@@ -419,7 +419,7 @@ async def test_editar_veiculo_schema_ano_invalido_alto_deve_retornar_422(
 
     payload_edicao = {"ano": ano_limite}
     response = await async_client.put(f"/veiculos/{uuid7()}", json=payload_edicao, headers=headers)
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio

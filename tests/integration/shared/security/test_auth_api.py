@@ -368,14 +368,16 @@ async def test_logout_com_sucesso_deve_revogar_token_e_limpar_cookie(
     refresh_cookie = login_res.cookies.get("refresh_token")
     assert refresh_cookie is not None
 
-    # 2. Executa o Logout passando o cookie capturado e cabeçalho de autenticação
+    # 2. Configura o cookie no cliente e executa o Logout
     headers = {}
     if access_token:
         headers["Authorization"] = f"Bearer {access_token}"
 
+    # Define o cookie diretamente na instância do cliente antes da requisição
+    async_client.cookies.set("refresh_token", refresh_cookie)
+
     logout_res = await async_client.post(
         "/auth/logout",
-        cookies={"refresh_token": refresh_cookie},
         headers=headers
     )
     assert logout_res.status_code == status.HTTP_200_OK
@@ -384,11 +386,8 @@ async def test_logout_com_sucesso_deve_revogar_token_e_limpar_cookie(
     novo_refresh_cookie = logout_res.cookies.get("refresh_token")
     assert novo_refresh_cookie in (None, "", "delete-cookie")
 
-    # 3. PROVA DE SEGURANÇA: Tenta usar o refresh token antigo que acabou de ser deslogado
-    refresh_res = await async_client.post(
-        "/auth/refresh",
-        cookies={"refresh_token": refresh_cookie}
-    )
+    # 3. PROVA DE SEGURANÇA: O cookie já está configurado no cliente, basta chamar o refresh
+    refresh_res = await async_client.post("/auth/refresh")
     assert refresh_res.status_code == status.HTTP_401_UNAUTHORIZED
 
 
@@ -441,11 +440,10 @@ async def test_deve_renovar_token_com_sucesso_usando_cookie_httponly(
     refresh_cookie = login_res.cookies.get("refresh_token")
     assert refresh_cookie is not None
 
-    # 2. Executa a chamada de renovação (refresh) enviando o cookie capturado
-    response = await async_client.post(
-        "/auth/refresh",
-        cookies={"refresh_token": refresh_cookie}
-    )
+    # 2. Configura o cookie no cliente e executa a chamada de renovação (refresh)
+    async_client.cookies.set("refresh_token", refresh_cookie)
+    
+    response = await async_client.post("/auth/refresh")
 
     assert response.status_code == status.HTTP_200_OK
     body = response.json()
@@ -477,10 +475,9 @@ async def test_refresh_com_cookie_invalido_deve_retornar_401(async_client: Async
     Cenário: Apresenta um cookie com assinatura ou hash adulterado/falso.
     Resultado esperado: 401 Unauthorized.
     """
-    response = await async_client.post(
-        "/auth/refresh",
-        cookies={"refresh_token": "token_completamente_falso_sha256"}
-    )
+    async_client.cookies.set("refresh_token", "token_completamente_falso_sha256")
+    
+    response = await async_client.post("/auth/refresh")
     
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert "Sessão de refresh inválida, expirada ou revogada." in response.json()["detail"]
@@ -504,17 +501,14 @@ async def test_politica_rtr_deve_impedir_uso_duplicado_do_mesmo_refresh_token(
     refresh_cookie = login_res.cookies.get("refresh_token")
 
     # 2. Primeira renovação: Deve ter sucesso absoluto (RTR invalida o token de entrada)
-    res_1 = await async_client.post(
-        "/auth/refresh",
-        cookies={"refresh_token": refresh_cookie}
-    )
+    async_client.cookies.set("refresh_token", refresh_cookie)
+    res_1 = await async_client.post("/auth/refresh")
     assert res_1.status_code == status.HTTP_200_OK
 
     # 3. Segunda tentativa com o MESMO token antigo: Deve falhar imediatamente!
-    res_2 = await async_client.post(
-        "/auth/refresh",
-        cookies={"refresh_token": refresh_cookie}
-    )
+    async_client.cookies.set("refresh_token", refresh_cookie)
+    res_2 = await async_client.post("/auth/refresh")
+    
     assert res_2.status_code == status.HTTP_401_UNAUTHORIZED
     assert "Sessão de refresh inválida, expirada ou revogada." in res_2.json()["detail"]
 

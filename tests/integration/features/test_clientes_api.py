@@ -371,7 +371,7 @@ async def test_editar_cliente_schemas_validacoes_devem_retornar_422(
     payload_edicao = {campo: valor_invalido}
     response = await async_client.put(f"/clientes/{uuid7()}", json=payload_edicao, headers=headers)
     
-    assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
 @pytest.mark.asyncio
