@@ -20,7 +20,7 @@ router = APIRouter(prefix="/relatorios", tags=["Relatórios Gerenciais"])
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(requer_roles([Role.GERENTE]))],
 )
-async def obter_relatorio_tempo_medio_pátio(
+async def obter_relatorio_tempo_medio_patio(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """

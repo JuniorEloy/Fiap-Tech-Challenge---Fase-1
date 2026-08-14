@@ -27,7 +27,7 @@ async def editar_cliente(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user=Depends(
         requer_roles([Role.RECEPCIONISTA, Role.GERENTE])
-    ),  # 👈 RBAC de segurança
+    ), 
 ):
     """
     Edita os dados cadastrais de um cliente existente.

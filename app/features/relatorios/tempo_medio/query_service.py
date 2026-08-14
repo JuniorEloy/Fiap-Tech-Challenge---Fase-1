@@ -63,10 +63,7 @@ class RelatorioTempoMedioQueryService:
 
                 # Validação para prevenir ruídos ou flutuações de segundos negativos
                 if duracao_minutos > 0:
-                    status_str = getattr(
-                        log.status_anterior, "value", log.status_anterior
-                    )
-                    tempos_por_etapa[status_str].append(duracao_minutos)
+                    tempos_por_etapa[ultimo_status].append(duracao_minutos)
 
                 ultimo_status = getattr(log.status_novo, "value", log.status_novo)
                 ultimo_timestamp = log.data_transicao

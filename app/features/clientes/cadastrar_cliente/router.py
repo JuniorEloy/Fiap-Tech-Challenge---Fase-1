@@ -27,7 +27,7 @@ router = APIRouter(prefix="/clientes", tags=["Clientes"])
 async def cadastrar_cliente(
     payload: CadastrarClienteRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    usuario_logado: UsuarioToken = Depends(obter_usuario_atual),
+    usuario_logado: Annotated[UsuarioToken, Depends(obter_usuario_atual)],
 ):
     """
     Cadastra um novo cliente no sistema (Pessoa Física ou Jurídica).

@@ -19,3 +19,4 @@ APP_ENV=test uv run python app/scripts/seed.py
 
 APP_ENV=test uv run pytest --cov=app --cov-report=term-missing     
 APP_ENV=test uv run pytest
+APP_ENV=test uv run pytest --junitxml=report.xml

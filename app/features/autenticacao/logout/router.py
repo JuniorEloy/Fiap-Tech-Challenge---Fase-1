@@ -16,7 +16,7 @@ router = APIRouter(prefix="/auth", tags=["Autenticação"])
 async def logout(
     response: Response,
     db: Annotated[AsyncSession, Depends(get_db)],
-    usuario_atual: UsuarioToken = Depends(obter_usuario_atual),
+    usuario_atual: Annotated[UsuarioToken, Depends(obter_usuario_atual)],
     refresh_token: Annotated[str | None, Cookie()] = None,
 ):
     """

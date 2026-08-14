@@ -64,7 +64,7 @@ async def buscar_cliente_por_documento(
 async def buscar_cliente_por_id(
     cliente_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
-    usuario_atual: UsuarioToken = Depends(obter_usuario_atual),
+    usuario_atual: Annotated[UsuarioToken, Depends(obter_usuario_atual)],
 ):
     # 🛡️ 2. Valida IDOR ANTES de ir ao banco de dados:
     # - Se for CLIENTE e cliente_id != usuario_atual.id -> Lança 403 Forbidden imediatamente!
