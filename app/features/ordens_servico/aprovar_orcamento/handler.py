@@ -10,7 +10,7 @@ from app.features.ordens_servico.aprovar_orcamento.schemas import (
     RespostaOrcamentoResponse,
 )
 from app.features.estoque.models import PecaInsumo
-
+from typing import Optional
 
 class ResponderOrcamentoHandler:
     def __init__(self, db: AsyncSession):
