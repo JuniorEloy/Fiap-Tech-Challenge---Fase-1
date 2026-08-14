@@ -167,7 +167,7 @@ class OrdemServico(Base):
     )
 
     def alterar_status(
-        self, novo_status: StatusOS, operador_id: Optional[UUID] = None 
+        self, novo_status: StatusOS, operador_id: Optional[UUID] = None
     ) -> OrdemServicoStatusLog:
         """
         Transiciona o status físico da Ordem de Serviço de forma segura,

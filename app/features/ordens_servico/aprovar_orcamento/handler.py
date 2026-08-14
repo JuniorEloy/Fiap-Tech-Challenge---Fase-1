@@ -12,13 +12,17 @@ from app.features.ordens_servico.aprovar_orcamento.schemas import (
 from app.features.estoque.models import PecaInsumo
 from typing import Optional
 
+
 class ResponderOrcamentoHandler:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repository = OrdemServicoRepository(db)
 
     async def executar(
-        self, os_id: UUID, command: ResponderOrcamentoRequest, operador_id: Optional[UUID] = None
+        self,
+        os_id: UUID,
+        command: ResponderOrcamentoRequest,
+        operador_id: Optional[UUID] = None,
     ) -> RespostaOrcamentoResponse:
         """
         Orquestra a aprovação ou rejeição da Ordem de Serviço pelo cliente:
