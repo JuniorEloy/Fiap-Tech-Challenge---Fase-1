@@ -12,7 +12,7 @@ def get_real_ip(request: Request) -> str:
     if x_forwarded_for:
         # O cabeçalho pode conter múltiplos IPs (ex: "client, proxy1, proxy2").
         # O primeiro IP é sempre o do cliente original.
-        return x_forwarded_for.split(",").strip()
+        return x_forwarded_for.split(",")[0].strip()
 
     x_real_ip = request.headers.get("X-Real-IP")
     if x_real_ip:
