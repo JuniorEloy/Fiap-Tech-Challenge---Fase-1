@@ -87,10 +87,11 @@ async def garantir_usuario_existe_no_banco(token: str, role: str, db) -> str:
     """Decodifica o payload do JWT, obtém o sub (UUID) e insere fisicamente na tabela usuarios se não existir."""
     from app.features.usuarios.models import Usuario
     from sqlalchemy import select
-    token_parts = token.split('.')
-    payload_decoded = base64.b64decode(token_parts[1] + '==').decode('utf-8')
+
+    token_parts = token.split(".")
+    payload_decoded = base64.b64decode(token_parts[1] + "==").decode("utf-8")
     payload_json = json.loads(payload_decoded)
-    user_id = payload_json['sub']
+    user_id = payload_json["sub"]
 
     res = await db.execute(select(Usuario).where(Usuario.id == user_id))
     user_db = res.scalar_one_or_none()
@@ -100,7 +101,7 @@ async def garantir_usuario_existe_no_banco(token: str, role: str, db) -> str:
             nome=f"Usuario Teste {role.capitalize()}",
             email=f"{role.lower()}.teste@oficina.com",
             role=role,
-            ativo=True
+            ativo=True,
         )
         db.add(new_user)
         await db.commit()
@@ -127,9 +128,11 @@ async def test_editar_cliente_com_sucesso(
         "email": f"cliente.original.{uid}@gmail.com",
         "telefone": "11988887777",
         "cpf_cnpj": cpf_doc,
-        "tipo_pessoa": "FISICA"
+        "tipo_pessoa": "FISICA",
     }
-    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    res_cliente = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
     assert res_cliente.status_code == status.HTTP_201_CREATED
     cliente_id = res_cliente.json()["id"]
 
@@ -137,9 +140,11 @@ async def test_editar_cliente_com_sucesso(
     payload_edicao = {
         "nome": f"Cliente Teste Editado {uid}",
         "email": f"cliente.editado.{uid}@gmail.com",
-        "telefone": "11977776666"
+        "telefone": "11977776666",
     }
-    response = await async_client.put(f"/clientes/{cliente_id}", json=payload_edicao, headers=headers)
+    response = await async_client.put(
+        f"/clientes/{cliente_id}", json=payload_edicao, headers=headers
+    )
 
     # 3. Asserções
     assert response.status_code == status.HTTP_200_OK
@@ -148,7 +153,9 @@ async def test_editar_cliente_com_sucesso(
     assert body["nome"] == f"Cliente Teste Editado {uid}"
     assert body["email"] == f"cliente.editado.{uid}@gmail.com"
     assert body["telefone"] == "11977776666"  # Formatado pelo VO
-    assert body["cpf_cnpj"] == f"{cpf_doc[:3]}.{cpf_doc[3:6]}.{cpf_doc[6:9]}-{cpf_doc[9:]}"  # Formatado pelo VO
+    assert (
+        body["cpf_cnpj"] == f"{cpf_doc[:3]}.{cpf_doc[3:6]}.{cpf_doc[6:9]}-{cpf_doc[9:]}"
+    )  # Formatado pelo VO
     assert body["tipo_pessoa"] == "FISICA"
 
 
@@ -173,18 +180,20 @@ async def test_editar_cliente_enviando_valores_nulos_deve_preservar_originais(
         "email": f"carla.preservar.{uid}@gmail.com",
         "telefone": "11955554444",
         "cpf_cnpj": cpf_doc,
-        "tipo_pessoa": "FISICA"
+        "tipo_pessoa": "FISICA",
     }
-    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    res_cliente = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
     assert res_cliente.status_code == status.HTTP_201_CREATED
     cliente_id = res_cliente.json()["id"]
 
     # 2. Executa a edição omitindo as chaves não alteradas.
     # 🌟 Isso resolve o erro 422 caso os validadores de campo do seu Schema local não aceitem None explícito!
-    payload_edicao = {
-        "nome": f"Cliente Carla Editada {uid}"
-    }
-    response = await async_client.put(f"/clientes/{cliente_id}", json=payload_edicao, headers=headers)
+    payload_edicao = {"nome": f"Cliente Carla Editada {uid}"}
+    response = await async_client.put(
+        f"/clientes/{cliente_id}", json=payload_edicao, headers=headers
+    )
 
     # 3. Asserções (valores omitidos preservam os dados originais)
     assert response.status_code == status.HTTP_200_OK
@@ -194,6 +203,7 @@ async def test_editar_cliente_enviando_valores_nulos_deve_preservar_originais(
     # 🌟 Ajustado para o comportamento do seu VO que retorna dígitos limpos sem formatação de máscara!
     assert body["telefone"] == "11955554444"  # Mantido!
     assert body["tipo_pessoa"] == "FISICA"  # Mantido!
+
 
 @pytest.mark.asyncio
 async def test_editar_cliente_mesmo_email_e_cpf_nao_deve_gerar_conflito(
@@ -217,9 +227,11 @@ async def test_editar_cliente_mesmo_email_e_cpf_nao_deve_gerar_conflito(
         "email": email_original,
         "telefone": "11944443333",
         "cpf_cnpj": cpf_doc,
-        "tipo_pessoa": "FISICA"
+        "tipo_pessoa": "FISICA",
     }
-    res_cliente = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    res_cliente = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
     assert res_cliente.status_code == status.HTTP_201_CREATED
     cliente_id = res_cliente.json()["id"]
 
@@ -227,10 +239,12 @@ async def test_editar_cliente_mesmo_email_e_cpf_nao_deve_gerar_conflito(
     payload_edicao = {
         "email": f"  clan.{uid}@oficina.com  ",  # Mesmo e-mail com espaços e caixa baixa
         "cpf_cnpj": f"{cpf_doc[:3]}.{cpf_doc[3:6]}.{cpf_doc[6:9]}-{cpf_doc[9:]}",  # Mesmo CPF com pontos e traços
-        "nome": f"Cliente Mesmos Dados Atualizado {uid}"
+        "nome": f"Cliente Mesmos Dados Atualizado {uid}",
     }
-    response = await async_client.put(f"/clientes/{cliente_id}", json=payload_edicao, headers=headers)
-    
+    response = await async_client.put(
+        f"/clientes/{cliente_id}", json=payload_edicao, headers=headers
+    )
+
     assert response.status_code == status.HTTP_200_OK
     body = response.json()
     assert body["email"] == f"clan.{uid}@oficina.com"  # Padronizado em caixa baixa
@@ -248,12 +262,12 @@ async def test_editar_cliente_inexistente_deve_retornar_404(
     headers = {"Authorization": f"Bearer {token_recepcionista}"}
     await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db)
 
-    payload_edicao = {
-        "nome": "Cliente Fantasma"
-    }
+    payload_edicao = {"nome": "Cliente Fantasma"}
     id_fake = str(uuid7())
-    response = await async_client.put(f"/clientes/{id_fake}", json=payload_edicao, headers=headers)
-    
+    response = await async_client.put(
+        f"/clientes/{id_fake}", json=payload_edicao, headers=headers
+    )
+
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert response.json()["detail"] == "Cliente não encontrado."
 
@@ -277,7 +291,7 @@ async def test_editar_cliente_duplicidade_email_deve_retornar_409(
         "email": f"letra.a.{uid}@oficina.com",
         "telefone": "11988881111",
         "cpf_cnpj": CPF().generate(),
-        "tipo_pessoa": "FISICA"
+        "tipo_pessoa": "FISICA",
     }
     await async_client.post("/clientes", json=payload_a, headers=headers)
 
@@ -287,19 +301,22 @@ async def test_editar_cliente_duplicidade_email_deve_retornar_409(
         "email": f"letra.b.{uid}@oficina.com",
         "telefone": "11988882222",
         "cpf_cnpj": CPF().generate(),
-        "tipo_pessoa": "FISICA"
+        "tipo_pessoa": "FISICA",
     }
     res_b = await async_client.post("/clientes", json=payload_b, headers=headers)
     cliente_b_id = res_b.json()["id"]
 
     # 3. Tenta editar o Cliente B para usar o e-mail do Cliente A
-    payload_edicao = {
-        "email": f"letra.a.{uid}@oficina.com"
-    }
-    response = await async_client.put(f"/clientes/{cliente_b_id}", json=payload_edicao, headers=headers)
-    
+    payload_edicao = {"email": f"letra.a.{uid}@oficina.com"}
+    response = await async_client.put(
+        f"/clientes/{cliente_b_id}", json=payload_edicao, headers=headers
+    )
+
     assert response.status_code == status.HTTP_409_CONFLICT
-    assert response.json()["detail"] == "O e-mail informado já está em uso por outro cliente."
+    assert (
+        response.json()["detail"]
+        == "O e-mail informado já está em uso por outro cliente."
+    )
 
 
 @pytest.mark.asyncio
@@ -323,7 +340,7 @@ async def test_editar_cliente_duplicidade_documento_deve_retornar_409(
         "email": f"doc.a.{uid}@oficina.com",
         "telefone": "11977771111",
         "cpf_cnpj": cpf_a,
-        "tipo_pessoa": "FISICA"
+        "tipo_pessoa": "FISICA",
     }
     await async_client.post("/clientes", json=payload_a, headers=headers)
 
@@ -333,19 +350,22 @@ async def test_editar_cliente_duplicidade_documento_deve_retornar_409(
         "email": f"doc.b.{uid}@oficina.com",
         "telefone": "11977772222",
         "cpf_cnpj": cpf_b,
-        "tipo_pessoa": "FISICA"
+        "tipo_pessoa": "FISICA",
     }
     res_b = await async_client.post("/clientes", json=payload_b, headers=headers)
     cliente_b_id = res_b.json()["id"]
 
     # 3. Tenta editar o Cliente B para usar o CPF do Cliente A
-    payload_edicao = {
-        "cpf_cnpj": cpf_a
-    }
-    response = await async_client.put(f"/clientes/{cliente_b_id}", json=payload_edicao, headers=headers)
-    
+    payload_edicao = {"cpf_cnpj": cpf_a}
+    response = await async_client.put(
+        f"/clientes/{cliente_b_id}", json=payload_edicao, headers=headers
+    )
+
     assert response.status_code == status.HTTP_409_CONFLICT
-    assert response.json()["detail"] == "Já existe um cliente cadastrado com o documento informado."
+    assert (
+        response.json()["detail"]
+        == "Já existe um cliente cadastrado com o documento informado."
+    )
 
 
 @pytest.mark.asyncio
@@ -353,13 +373,17 @@ async def test_editar_cliente_duplicidade_documento_deve_retornar_409(
     "campo,valor_invalido",
     [
         ("email", "email_invalido_sem_arroba"),
-        ("telefone", "1234567"),              # Telefone curto demais
-        ("cpf_cnpj", "11111111111"),          # CPF matematicamente inválido
-        ("nome", "Jo")                        # Nome curto demais
-    ]
+        ("telefone", "1234567"),  # Telefone curto demais
+        ("cpf_cnpj", "11111111111"),  # CPF matematicamente inválido
+        ("nome", "Jo"),  # Nome curto demais
+    ],
 )
 async def test_editar_cliente_schemas_validacoes_devem_retornar_422(
-    async_client: AsyncClient, token_recepcionista: str, db, campo: str, valor_invalido: str
+    async_client: AsyncClient,
+    token_recepcionista: str,
+    db,
+    campo: str,
+    valor_invalido: str,
 ):
     """
     Cenário: Tenta editar um cliente passando dados sintáticos inválidos para validar a barreira dos Schemas.
@@ -369,8 +393,10 @@ async def test_editar_cliente_schemas_validacoes_devem_retornar_422(
     await garantir_usuario_existe_no_banco(token_recepcionista, "RECEPCIONISTA", db)
 
     payload_edicao = {campo: valor_invalido}
-    response = await async_client.put(f"/clientes/{uuid7()}", json=payload_edicao, headers=headers)
-    
+    response = await async_client.put(
+        f"/clientes/{uuid7()}", json=payload_edicao, headers=headers
+    )
+
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
 
 
@@ -386,7 +412,9 @@ async def test_mecanico_nao_deve_ter_permissao_de_editar_cliente(
     await garantir_usuario_existe_no_banco(token_mecanico, "MECANICO", db)
 
     payload = {"nome": "Tentativa Invasao Mecanico"}
-    response = await async_client.put(f"/clientes/{uuid7()}", json=payload, headers=headers)
+    response = await async_client.put(
+        f"/clientes/{uuid7()}", json=payload, headers=headers
+    )
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
@@ -402,13 +430,15 @@ async def test_estoquista_nao_deve_ter_permissao_de_editar_cliente(
     await garantir_usuario_existe_no_banco(token_estoquista, "ESTOQUISTA", db)
 
     payload = {"nome": "Tentativa Invasao Estoquista"}
-    response = await async_client.put(f"/clientes/{uuid7()}", json=payload, headers=headers)
+    response = await async_client.put(
+        f"/clientes/{uuid7()}", json=payload, headers=headers
+    )
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.asyncio
 async def test_usuario_nao_autenticado_deve_receber_401_ao_editar_cliente(
-    async_client: AsyncClient
+    async_client: AsyncClient,
 ):
     """
     Cenário: Chamada para editar cliente sem passar o cabeçalho Authorization JWT.

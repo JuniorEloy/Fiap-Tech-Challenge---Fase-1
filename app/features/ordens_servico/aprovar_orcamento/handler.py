@@ -127,4 +127,6 @@ class ResponderOrcamentoHandler:
             )
 
         # Executa o fluxo padrão usando o ID do próprio cliente como o operador que assinou
-        return await self.executar(os_id=os.id, command=command, operador_id=None)
+        return await self.executar(
+            os_id=os.id, command=command, operador_id=os.cliente_id
+        )

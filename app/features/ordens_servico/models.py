@@ -18,6 +18,7 @@ clock = DateTimeProvider()
 CASCADE = "all, delete-orphan"
 ORDEM_SERVICO_ID = "ordens_servico.id"
 
+
 class StatusOS(str, Enum):
     """
     Representação de todo o ciclo de vida operacional de uma Ordem de Serviço (OS).

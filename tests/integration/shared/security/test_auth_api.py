@@ -324,17 +324,19 @@ async def test_login_excedendo_rate_limit_deve_bloquear(
 
     assert status.HTTP_429_TOO_MANY_REQUESTS in responses
 
-# 🌟 CORREÇÃO DO RATE LIMITER: 
+
+# 🌟 CORREÇÃO DO RATE LIMITER:
 # Em vez de desativar globalmente, desativamos dinamicamente para todos os testes,
 # EXCETO para aqueles que validam explicitamente o rate limit (que possuem 'rate_limit' ou 'ratelimit' no nome).
 @pytest.fixture(autouse=True)
 def gerenciar_rate_limiter_nos_testes(request):
     try:
         from app.shared.security.rate_limiter import limiter
+
         if "rate_limit" in request.node.name or "ratelimit" in request.node.name:
             limiter.enabled = True  # Ativo para testes de rate limit
         else:
-            limiter.enabled = False # Desativado para os demais para evitar 429
+            limiter.enabled = False  # Desativado para os demais para evitar 429
         yield
         limiter.enabled = True  # Restaura o estado padrão ao final
     except ImportError:
@@ -343,27 +345,24 @@ def gerenciar_rate_limiter_nos_testes(request):
 
 @pytest.mark.asyncio
 async def test_logout_com_sucesso_deve_revogar_token_e_limpar_cookie(
-    async_client: AsyncClient
+    async_client: AsyncClient,
 ):
     """
     Cenário: Operador válido faz login, obtém sessão e decide deslogar (Logout).
-    Resultado esperado: 
+    Resultado esperado:
     1. 200 OK no logout.
     2. Envio do cabeçalho Set-Cookie para expirar/deletar o cookie 'refresh_token'.
     3. Qualquer chamada subsequente de Refresh usando o token antigo deve falhar (401),
        provando que a sessão foi marcada de fato como revogada no banco de dados.
     """
     # 1. Faz login com o gerente para gerar uma sessão real de refresh token no banco
-    login_payload = {
-        "email": "armando.gerente@oficina.com",
-        "senha": "Gerente123!"
-    }
+    login_payload = {"email": "armando.gerente@oficina.com", "senha": "Gerente123!"}
     login_res = await async_client.post("/auth/login", json=login_payload)
     assert login_res.status_code == status.HTTP_200_OK
-    
+
     body_login = login_res.json()
     access_token = body_login.get("access_token")
-    
+
     # Captura o cookie de refresh gerado no login
     refresh_cookie = login_res.cookies.get("refresh_token")
     assert refresh_cookie is not None
@@ -376,10 +375,7 @@ async def test_logout_com_sucesso_deve_revogar_token_e_limpar_cookie(
     # Define o cookie diretamente na instância do cliente antes da requisição
     async_client.cookies.set("refresh_token", refresh_cookie)
 
-    logout_res = await async_client.post(
-        "/auth/logout",
-        headers=headers
-    )
+    logout_res = await async_client.post("/auth/logout", headers=headers)
     assert logout_res.status_code == status.HTTP_200_OK
 
     # Verifica se o cabeçalho de resposta configurou a remoção do cookie
@@ -393,7 +389,7 @@ async def test_logout_com_sucesso_deve_revogar_token_e_limpar_cookie(
 
 @pytest.mark.asyncio
 async def test_logout_sem_cookie_deve_funcionar_de_forma_idempotente_autenticado(
-    async_client: AsyncClient
+    async_client: AsyncClient,
 ):
     """
     Cenário: Usuário autenticado tenta efetuar logout mas não possui um cookie ativo
@@ -401,48 +397,43 @@ async def test_logout_sem_cookie_deve_funcionar_de_forma_idempotente_autenticado
     Resultado esperado: 200 OK (o logout deve ser idempotente para sessões autenticadas).
     """
     # 1. Faz login com o gerente para obter autenticação válida
-    login_payload = {
-        "email": "armando.gerente@oficina.com",
-        "senha": "Gerente123!"
-    }
+    login_payload = {"email": "armando.gerente@oficina.com", "senha": "Gerente123!"}
     login_res = await async_client.post("/auth/login", json=login_payload)
     assert login_res.status_code == status.HTTP_200_OK
-    
+
     access_token = login_res.json().get("access_token")
     headers = {"Authorization": f"Bearer {access_token}"}
 
     # 2. Executa o logout SEM enviar o cookie de refresh
     response = await async_client.post("/auth/logout", headers=headers)
-    
+
     # Deve responder com 200 OK com sucesso, limpando de forma idempotente
     assert response.status_code == status.HTTP_200_OK
-    
+
     cookie_limpo = response.cookies.get("refresh_token")
     assert cookie_limpo in (None, "", "delete-cookie")
 
+
 @pytest.mark.asyncio
 async def test_deve_renovar_token_com_sucesso_usando_cookie_httponly(
-    async_client: AsyncClient
+    async_client: AsyncClient,
 ):
     """
     Cenário: Operador válido tenta renovar o token enviando o Cookie de Refresh Token.
     Resultado esperado: 200 OK, geração de novo access token e cookie de refresh rotacionado (RTR).
     """
     # 1. Faz login com operador da Seed para capturar os cookies reais
-    login_payload = {
-        "email": "armando.gerente@oficina.com",
-        "senha": "Gerente123!"
-    }
+    login_payload = {"email": "armando.gerente@oficina.com", "senha": "Gerente123!"}
     login_res = await async_client.post("/auth/login", json=login_payload)
     assert login_res.status_code == status.HTTP_200_OK
-    
+
     # Captura o cookie HttpOnly de refresh retornado no login
     refresh_cookie = login_res.cookies.get("refresh_token")
     assert refresh_cookie is not None
 
     # 2. Configura o cookie no cliente e executa a chamada de renovação (refresh)
     async_client.cookies.set("refresh_token", refresh_cookie)
-    
+
     response = await async_client.post("/auth/refresh")
 
     assert response.status_code == status.HTTP_200_OK
@@ -464,7 +455,7 @@ async def test_refresh_sem_cookie_deve_retornar_401(async_client: AsyncClient):
     Resultado esperado: 401 Unauthorized com mensagem clara de erro.
     """
     response = await async_client.post("/auth/refresh")
-    
+
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert response.json()["detail"] == "Cookie de Refresh Token não fornecido."
 
@@ -476,26 +467,25 @@ async def test_refresh_com_cookie_invalido_deve_retornar_401(async_client: Async
     Resultado esperado: 401 Unauthorized.
     """
     async_client.cookies.set("refresh_token", "token_completamente_falso_sha256")
-    
+
     response = await async_client.post("/auth/refresh")
-    
+
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
-    assert "Sessão de refresh inválida, expirada ou revogada." in response.json()["detail"]
+    assert (
+        "Sessão de refresh inválida, expirada ou revogada." in response.json()["detail"]
+    )
 
 
 @pytest.mark.asyncio
 async def test_politica_rtr_deve_impedir_uso_duplicado_do_mesmo_refresh_token(
-    async_client: AsyncClient
+    async_client: AsyncClient,
 ):
     """
     Cenário: Um atacante tenta reutilizar um refresh token que já foi rotacionado (utilizado uma vez).
     Resultado esperado: 401 Unauthorized na segunda tentativa, impedindo sequestro de sessão.
     """
     # 1. Faz login inicial
-    login_payload = {
-        "email": "barbara.recepcao@oficina.com",
-        "senha": "Recepcao123!"
-    }
+    login_payload = {"email": "barbara.recepcao@oficina.com", "senha": "Recepcao123!"}
     login_res = await async_client.post("/auth/login", json=login_payload)
     assert login_res.status_code == status.HTTP_200_OK
     refresh_cookie = login_res.cookies.get("refresh_token")
@@ -508,7 +498,7 @@ async def test_politica_rtr_deve_impedir_uso_duplicado_do_mesmo_refresh_token(
     # 3. Segunda tentativa com o MESMO token antigo: Deve falhar imediatamente!
     async_client.cookies.set("refresh_token", refresh_cookie)
     res_2 = await async_client.post("/auth/refresh")
-    
+
     assert res_2.status_code == status.HTTP_401_UNAUTHORIZED
     assert "Sessão de refresh inválida, expirada ou revogada." in res_2.json()["detail"]
 
@@ -516,6 +506,7 @@ async def test_politica_rtr_deve_impedir_uso_duplicado_do_mesmo_refresh_token(
 # =============================================================================
 # 🎯 TESTES DIRETOS DO HANDLER (COBERTURA MÁXIMA DA GERAÇÃO DE NOVOS TOKENS/RTR)
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_handler_refresh_sucesso_deve_persistir_e_rotacionar_corretamente(db):
@@ -532,7 +523,7 @@ async def test_handler_refresh_sucesso_deve_persistir_e_rotacionar_corretamente(
         email=f"mecanico.refresh.{str(uid)[:6]}@oficina.com",
         senha=gerar_hash_senha("SenhaSegura123!"),
         role=Role.MECANICO,
-        ativo=True
+        ativo=True,
     )
     db.add(usuario_teste)
     await db.commit()
@@ -540,19 +531,21 @@ async def test_handler_refresh_sucesso_deve_persistir_e_rotacionar_corretamente(
     # 2. Cria uma sessão activa no banco de dados para esse usuário
     raw_token_teste = "raw_refresh_token_teste_de_cobertura_12345"
     token_hash_original = gerar_hash_token(raw_token_teste)
-    
+
     sessao_original = RefreshTokenSession(
         usuario_id=usuario_teste.id,
         token_hash=token_hash_original,
         expira_em=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=2),
-        revogado=False
+        revogado=False,
     )
     db.add(sessao_original)
     await db.commit()
 
     # 3. Instancia o Handler e executa a rotação de token de forma isolada
     handler = RefreshHandler(db)
-    novo_access, novo_refresh_bruto, exp_segundos = await handler.executar(raw_token_teste)
+    novo_access, novo_refresh_bruto, exp_segundos = await handler.executar(
+        raw_token_teste
+    )
 
     # 4. Asserções do retorno do Handler
     assert novo_access is not None

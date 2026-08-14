@@ -51,10 +51,11 @@ class RefreshHandler:
 
         agora = self.clock.agora()
         agora_naive = agora.replace(tzinfo=None) if agora.tzinfo else agora
-        
-        limite_tempo = sessao.expira_em if sessao.expira_em else agora_naive
-        limite_naive = limite_tempo.replace(tzinfo=None) if limite_tempo.tzinfo else limite_tempo
 
+        limite_tempo = sessao.expira_em if sessao.expira_em else agora_naive
+        limite_naive = (
+            limite_tempo.replace(tzinfo=None) if limite_tempo.tzinfo else limite_tempo
+        )
 
         # Sessão Inexistente ou Expirada pelo Tempo
         if not sessao or limite_naive < agora_naive:
@@ -70,7 +71,9 @@ class RefreshHandler:
             criado_em = getattr(
                 sessao, "created_at", getattr(sessao, "data_criacao", None)
             )
-            criado_em_naive = criado_em.replace(tzinfo=None) if criado_em.tzinfo else criado_em
+            criado_em_naive = (
+                criado_em.replace(tzinfo=None) if criado_em.tzinfo else criado_em
+            )
 
             # Tolerância padrão de 10 segundos para concorrência de rede do front-end (Grace Period)
             fora_da_janela = True

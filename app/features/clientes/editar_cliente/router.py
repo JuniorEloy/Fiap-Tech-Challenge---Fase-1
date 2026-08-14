@@ -12,6 +12,7 @@ from app.features.clientes.editar_cliente.schemas import (
     EditarClienteRequest,
     ClienteEditadoResponse,
 )
+from app.features.usuarios.models import Usuario
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
@@ -25,9 +26,9 @@ async def editar_cliente(
     id: UUID,
     payload: EditarClienteRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user=Depends(
-        requer_roles([Role.RECEPCIONISTA, Role.GERENTE])
-    ), 
+    current_user: Annotated[
+        Usuario, Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE]))
+    ],
 ):
     """
     Edita os dados cadastrais de um cliente existente.
