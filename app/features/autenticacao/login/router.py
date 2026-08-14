@@ -26,7 +26,7 @@ async def login(
     """
     # 1. Executa o caso de uso no Handler
     handler = LoginHandler(db)
-    usuario, access_token, token_bruto = await handler.executar(body.email, body.senha)
+    _, access_token, token_bruto = await handler.executar(body.email, body.senha)
 
     # 2. Grava o Refresh Token em Cookie HttpOnly
     response.set_cookie(

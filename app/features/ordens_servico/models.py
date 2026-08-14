@@ -15,6 +15,8 @@ from app.features.servicos.models import ServicoBase
 
 clock = DateTimeProvider()
 
+CASCADE = "all, delete-orphan"
+ORDEM_SERVICO_ID = "ordens_servico.id"
 
 class StatusOS(str, Enum):
     """
@@ -147,19 +149,19 @@ class OrdemServico(Base):
     itens_servico: Mapped[List["ItemServicoOS"]] = relationship(
         "ItemServicoOS",
         back_populates="ordem_servico",
-        cascade="all, delete-orphan",
+        cascade=CASCADE,
         lazy="selectin",
     )
     itens_peca: Mapped[List["ItemPecaOS"]] = relationship(
         "ItemPecaOS",
         back_populates="ordem_servico",
-        cascade="all, delete-orphan",
+        cascade=CASCADE,
         lazy="selectin",
     )
     logs_status: Mapped[List["OrdemServicoStatusLog"]] = relationship(
         "OrdemServicoStatusLog",
         back_populates="ordem_servico",
-        cascade="all, delete-orphan",
+        cascade=CASCADE,
         lazy="selectin",
     )
 
@@ -241,7 +243,7 @@ class ItemServicoOS(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
 
     ordem_servico_id: Mapped[UUID] = mapped_column(
-        ForeignKey("ordens_servico.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey(ORDEM_SERVICO_ID, ondelete="CASCADE"), nullable=False, index=True
     )
 
     servico_base_id: Mapped[UUID] = mapped_column(
@@ -284,7 +286,7 @@ class ItemPecaOS(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
 
     ordem_servico_id: Mapped[UUID] = mapped_column(
-        ForeignKey("ordens_servico.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey(ORDEM_SERVICO_ID, ondelete="CASCADE"), nullable=False, index=True
     )
 
     peca_id: Mapped[UUID] = mapped_column(
@@ -325,7 +327,7 @@ class OrdemServicoStatusLog(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
 
     ordem_servico_id: Mapped[UUID] = mapped_column(
-        ForeignKey("ordens_servico.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey(ORDEM_SERVICO_ID, ondelete="CASCADE"), nullable=False, index=True
     )
 
     status_anterior: Mapped[Optional[StatusOS]] = mapped_column(
