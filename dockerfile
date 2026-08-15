@@ -39,17 +39,15 @@ RUN addgroup --system app && \
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/app /app/app
 
+COPY --chown=app:app alembic ./alembic
+COPY --chown=app:app alembic.ini .
+COPY --chmod=755 --chown=app:app docker/entrypoint.sh .
+
 USER app
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/')" || exit 1
-
-COPY alembic ./alembic
-COPY alembic.ini .
-COPY docker/entrypoint.sh .
-
-RUN chmod +x entrypoint.sh
 
 CMD ["./entrypoint.sh"]
