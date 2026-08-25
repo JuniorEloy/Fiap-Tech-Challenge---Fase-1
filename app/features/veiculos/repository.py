@@ -3,6 +3,7 @@ from typing import Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.veiculos.models import Veiculo
+from app.features.ordens_servico.models import OrdemServico
 
 
 class VeiculoRepository:
@@ -22,6 +23,17 @@ class VeiculoRepository:
             select(Veiculo).where(Veiculo.cliente_id == cliente_id)
         )
         return result.scalars().all()
+
+    async def possui_ordens_servico(self, veiculo_id: UUID) -> bool:
+        """
+        Verifica se o veiculo ja possui Ordens de Servico historicas ou ativas.
+        """
+        stmt = select(OrdemServico).where(OrdemServico.veiculo_id == veiculo_id)
+        res = await self.db.execute(stmt)
+        return res.scalars().first() is not None
+
+    async def excluir(self, veiculo: Veiculo) -> None:
+        await self.db.delete(veiculo)
 
     async def salvar(self, veiculo: Veiculo) -> Veiculo:
         self.db.add(veiculo)

@@ -101,7 +101,7 @@ O codigo fonte do Mecanicar e verificado de forma continua para alcancar conform
 
 ---
 
-## 6. Guia de Inicializacao Rapida (Quick Start)
+## 6. Guia de Inicializacao Rapida PROD (Quick Start)
 
 Coloque toda a aplicacao, o banco de dados e a massa de testes de producao em execucao local em um unico comando.
 
@@ -123,7 +123,21 @@ docker compose up --build
 
 ---
 
-## 7. Credenciais de Testes e Massa de Dados
+## 7. Guia de Inicializacao Rapida TEST (Quick Start)
+
+docker compose -f docker-compose.test.yml up -d
+
+APP_ENV=test alembic upgrade head
+APP_ENV=test uv run python app/scripts/seed.py
+
+APP_ENV=test uv run pytest --cov=app --cov-report=term-missing     
+APP_ENV=test uv run pytest
+APP_ENV=test uv run pytest --junitxml=report.xml
+coverage xml -i
+
+---
+
+## 8. Credenciais de Testes e Massa de Dados
 
 Utilize os usuarios cadastrados pelo seeder automatico para simular o acesso baseado em papeis (RBAC):
 

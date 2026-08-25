@@ -712,3 +712,123 @@ async def test_editar_veiculo_mesma_placa_nao_deve_gerar_conflito(
         body["placa"] == placa_original.upper()
     )  # Mantém a mesma placa limpa e formatada
     assert body["modelo"] == "HB20 Editado"
+
+
+@pytest.mark.asyncio
+async def test_gerente_deve_excluir_veiculo_sem_vinculos_com_sucesso(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    cpf_valido = CPF().generate()
+
+    # 1. Cadastra um cliente de teste unico
+    payload_cliente = {
+        "nome": "Carla Veiculo",
+        "email": f"carla.veiculo.{uuid7().hex[:6]}@mecanicar.com",
+        "telefone": "11988887777",
+        "cpf_cnpj": cpf_valido,
+        "tipo_pessoa": "FISICA",
+    }
+    res_cli = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
+    assert res_cli.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cli.json()["id"]
+
+    # 2. Cadastra o veiculo de teste para este cliente com placa valida mercosul
+    placa_teste = gerar_placa_valida_para_teste()
+    payload_veiculo = {
+        "placa": placa_teste,
+        "marca": "Chevrolet",
+        "modelo": "Onix",
+        "ano": 2022,
+        "cliente_id": cliente_id,
+    }
+    res_vei = await async_client.post(
+        "/veiculos", json=payload_veiculo, headers=headers
+    )
+    assert res_vei.status_code == status.HTTP_201_CREATED
+    veiculo_id = res_vei.json()["id"]
+
+    # 3. Executa a exclusao do veiculo cadastrado
+    res_del = await async_client.delete(f"/veiculos/{veiculo_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_204_NO_CONTENT
+
+    # 4. Garante que nao e possivel encontrar o veiculo mais (consultando pela placa, rota que realmente existe)
+    res_get = await async_client.get(f"/veiculos/placa/{placa_teste}", headers=headers)
+    assert res_get.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_deve_bloquear_exclusao_de_veiculo_com_ordem_servico_vinculada(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    cpf_valido = CPF().generate()
+
+    # 1. Cadastra um cliente de teste unico
+    payload_cliente = {
+        "nome": "Carla Vinculo OS",
+        "email": f"carla.vinculo.{uuid7().hex[:6]}@mecanicar.com",
+        "telefone": "11988887777",
+        "cpf_cnpj": cpf_valido,
+        "tipo_pessoa": "FISICA",
+    }
+    res_cli = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
+    assert res_cli.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cli.json()["id"]
+
+    # 2. Cadastra o veiculo de teste com placa valida mercosul
+    payload_veiculo = {
+        "placa": gerar_placa_valida_para_teste(),
+        "marca": "Chevrolet",
+        "modelo": "Onix",
+        "ano": 2022,
+        "cliente_id": cliente_id,
+    }
+    res_vei = await async_client.post(
+        "/veiculos", json=payload_veiculo, headers=headers
+    )
+    assert res_vei.status_code == status.HTTP_201_CREATED
+    veiculo_id = res_vei.json()["id"]
+
+    # 3. Abre uma Ordem de Servico vinculada a este veiculo
+    payload_os = {
+        "cliente_id": cliente_id,
+        "veiculo_id": veiculo_id,
+        "servicos": [],
+        "pecas": [],
+    }
+    res_os = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers
+    )
+    assert res_os.status_code == status.HTTP_201_CREATED
+
+    # 4. Tenta excluir o veiculo que agora possui vinculo historico/ativo com OS
+    res_del = await async_client.delete(f"/veiculos/{veiculo_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_400_BAD_REQUEST
+    assert "possui ordens de servico vinculadas" in res_del.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_mecanico_nao_deve_excluir_veiculo(
+    async_client: AsyncClient, token_mecanico: str
+):
+    headers = {"Authorization": f"Bearer {token_mecanico}"}
+    veiculo_id = str(uuid7())
+
+    res_del = await async_client.delete(f"/veiculos/{veiculo_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_excluir_veiculo_inexistente_deve_retornar_404(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    id_inexistente = str(uuid7())
+
+    res_del = await async_client.delete(f"/veiculos/{id_inexistente}", headers=headers)
+    assert res_del.status_code == status.HTTP_404_NOT_FOUND

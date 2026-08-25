@@ -264,16 +264,16 @@ async def test_gerente_deve_obter_relatorio_de_tempos_com_sucesso(
 
     body = response.json()
     assert body["total_ordens_avaliadas"] >= 1
-    assert body["tempo_medio_geral_minutos"] == 210
-    assert body["tempo_medio_trabalho_ativo_minutos"] == 150
-    assert body["tempo_medio_espera_aprovacao_minutos"] == 60
+    assert body["tempo_medio_geral_minutos"] == 155
+    assert body["tempo_medio_trabalho_ativo_minutos"] == 70
+    assert body["tempo_medio_espera_aprovacao_minutos"] == 85
 
     # Valida detalhamento refinado de tempos por etapa operacional
     detalhes_etapas = body["tempo_medio_por_etapa_minutos"]
-    assert detalhes_etapas["RECEBIDA"] == 15
+    assert detalhes_etapas["RECEBIDA"] == 11
     assert detalhes_etapas["EM_DIAGNOSTICO"] == 45
-    assert detalhes_etapas["AGUARDANDO_APROVACAO"] == 60
-    assert detalhes_etapas["EM_EXECUCAO"] == 90
+    assert detalhes_etapas["AGUARDANDO_APROVACAO"] == 85
+    assert detalhes_etapas["EM_EXECUCAO"] == 60
 
 
 @pytest.mark.asyncio

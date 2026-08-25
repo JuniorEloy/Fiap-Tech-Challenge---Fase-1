@@ -9,6 +9,9 @@ from app.features.veiculos.consultar_veiculo.router import (
 from app.features.veiculos.editar_veiculo.router import (
     router as editar_veiculo_router,
 )
+from app.features.veiculos.excluir_veiculo.router import (
+    router as excluir_veiculo_router,
+)
 
 veiculo_router = APIRouter()
 
@@ -16,3 +19,4 @@ veiculo_router = APIRouter()
 veiculo_router.include_router(cadastrar_veiculo_router)
 veiculo_router.include_router(consultar_veiculo_router)
 veiculo_router.include_router(editar_veiculo_router)
+veiculo_router.include_router(excluir_veiculo_router)
