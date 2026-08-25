@@ -23,19 +23,8 @@ class RefreshHandler:
         self.db = db
         self.clock = DateTimeProvider()
 
-    async def executar(self, raw_refresh_token: str) -> tuple[str, str, int]:
-        """
-        Executa a rotação de refresh token (RTR):
-        1. Calcula o hash SHA-256 do token bruto apresentado.
-        2. Localiza a sessão correspondente ativa no banco.
-        3. Valida expiração e estado de revogação.
-        4. Revoga o token atual e gera um novo par rotacionado.
-        5. Retorna o (novo_access_token, novo_raw_refresh, expiracao_segundos).
-        """
-        # 1. Calcula hash do token de entrada
+    async def _buscar_sessao(self, raw_refresh_token: str) -> RefreshTokenSession:
         token_hash = gerar_hash_token(raw_refresh_token)
-
-        # 2. Busca sessão no banco de dados
         stmt = select(RefreshTokenSession).where(
             RefreshTokenSession.token_hash == token_hash
         )
@@ -48,7 +37,9 @@ class RefreshHandler:
                 detail=MSG_SESSAO_INVALIDA,
                 headers={"WWW-Authenticate": "Bearer"},
             )
+        return sessao
 
+    def _validar_expiracao(self, sessao: RefreshTokenSession) -> None:
         agora = self.clock.agora()
         agora_naive = agora.replace(tzinfo=None) if agora.tzinfo else agora
 
@@ -57,67 +48,55 @@ class RefreshHandler:
             limite_tempo.replace(tzinfo=None) if limite_tempo.tzinfo else limite_tempo
         )
 
-        # Sessão Inexistente ou Expirada pelo Tempo
-        if not sessao or limite_naive < agora_naive:
+        if limite_naive < agora_naive:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=MSG_SESSAO_INVALIDA,
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # DETECÇÃO DE VIOLAÇÃO / REUSO (RTR Violation): Se o token apresentado já foi revogado antes
-        if sessao.revogado:
-            # Recupera o timestamp de criação da sessão (resiliente a 'created_at' ou 'data_criacao')
-            criado_em = getattr(
-                sessao, "created_at", getattr(sessao, "data_criacao", None)
+    async def _tratar_sessao_revogada(self, sessao: RefreshTokenSession) -> None:
+        if not sessao.revogado:
+            return
+
+        criado_em = getattr(
+            sessao, "created_at", getattr(sessao, "data_criacao", None)
+        )
+        criado_em_naive = (
+            criado_em.replace(tzinfo=None) if criado_em and criado_em.tzinfo else criado_em
+        )
+
+        fora_da_janela = True
+        if criado_em_naive:
+            tempo_decorrido = self.clock.agora() - criado_em_naive
+            fora_da_janela = tempo_decorrido > timedelta(seconds=10)
+
+        if fora_da_janela:
+            stmt_invalidar = (
+                update(RefreshTokenSession)
+                .where(
+                    RefreshTokenSession.usuario_id == sessao.usuario_id,
+                    RefreshTokenSession.revogado == False,
+                )
+                .values(revogado=True)
             )
-            criado_em_naive = (
-                criado_em.replace(tzinfo=None) if criado_em.tzinfo else criado_em
+            await self.db.execute(stmt_invalidar)
+            await self.db.commit()
+
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Sessão de refresh inválida, expirada ou revogada. Detectada tentativa de reuso (violação de segurança).",
+                headers={"WWW-Authenticate": "Bearer"},
             )
-
-            # Tolerância padrão de 10 segundos para concorrência de rede do front-end (Grace Period)
-            fora_da_janela = True
-            if criado_em:
-                tempo_decorrido = self.clock.agora() - criado_em_naive
-                fora_da_janela = tempo_decorrido > timedelta(seconds=10)
-
-            if fora_da_janela:
-                # VIOLAÇÃO DETECTADA (Fora da janela de 10s): Invalidamos todas as outras sessões ativas do usuário
-                stmt_invalidar = (
-                    update(RefreshTokenSession)
-                    .where(
-                        RefreshTokenSession.usuario_id == sessao.usuario_id,
-                        RefreshTokenSession.revogado == False,
-                    )
-                    .values(revogado=True)
-                )
-                await self.db.execute(stmt_invalidar)
-                await self.db.commit()
-
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Sessão de refresh inválida, expirada ou revogada. Detectada tentativa de reuso (violação de segurança).",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-            else:
-                # CONCORRÊNCIA ACEITA (Dentro da janela de 10s): Apenas rejeita a requisição atual
-                # mas não revoga as demais sessões do usuário ativo!
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=MSG_SESSAO_INVALIDA,
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-
-        # Validação de integridade da sessão
-        if not sessao or sessao.revogado or limite_naive < agora_naive:
+        else:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=MSG_SESSAO_INVALIDA,
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        # 3. Busca operador associado para herdar permissões e role
-        stmt_usuario = select(Usuario).where(Usuario.id == sessao.usuario_id)
+    async def _buscar_usuario_ativo(self, usuario_id: UUID) -> Usuario:
+        stmt_usuario = select(Usuario).where(Usuario.id == usuario_id)
         res_usuario = await self.db.execute(stmt_usuario)
         usuario = res_usuario.scalar_one_or_none()
 
@@ -126,6 +105,28 @@ class RefreshHandler:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Operador inativo ou não cadastrado no sistema.",
             )
+        return usuario
+
+    async def executar(self, raw_refresh_token: str) -> tuple[str, str, int]:
+        """
+        Executa a rotação de refresh token (RTR):
+        1. Calcula o hash SHA-256 do token bruto apresentado.
+        2. Localiza a sessão correspondente ativa no banco.
+        3. Valida expiração e estado de revogação.
+        4. Revoga o token atual e gera um novo par rotacionado.
+        5. Retorna o (novo_access_token, novo_raw_refresh, expiracao_segundos).
+        """
+        # 1 e 2. Busca e valida integridade básica da sessão
+        sessao = await self.db.run_sync(lambda: None) if False else await self._buscar_sessao(raw_refresh_token)
+        
+        # Validação de expiração temporal
+        self._validar_expiracao(sessao)
+
+        # Tratamento de detecção de reuso / violação RTR
+        await self._tratar_sessao_revogada(sessao)
+
+        # 3. Busca operador associado para herdar permissões e role
+        usuario = await self._buscar_usuario_ativo(sessao.usuario_id)
 
         # 4. Refresh Token Rotation (RTR): Invalida o token atual
         sessao.revogado = True

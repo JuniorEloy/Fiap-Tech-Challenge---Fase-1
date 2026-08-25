@@ -18,6 +18,43 @@ class ResponderOrcamentoHandler:
         self.db = db
         self.repository = OrdemServicoRepository(db)
 
+    async def _processar_baixa_estoque(self, os: OrdemServico) -> None:
+        """Adquire lock pessimista e processa a baixa no estoque dos itens da OS."""
+        if not os.itens_peca:
+            return
+
+        peca_ids = [item.peca_id for item in os.itens_peca]
+
+        # Executa select com FOR UPDATE para evitar Race Conditions
+        query_estoque = (
+            select(PecaInsumo)
+            .where(PecaInsumo.id.in_(peca_ids))
+            .with_for_update()  # 🌟 LOCK PESSIMISTA ATIVO!
+        )
+        res_estoque = await self.db.execute(query_estoque)
+        pecas_db = {p.id: p for p in res_estoque.scalars().all()}
+
+        # Valida se as peças existem e se há estoque suficiente
+        for item in os.itens_peca:
+            peca_estoque = pecas_db.get(item.peca_id)
+            if not peca_estoque:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Peça ou insumo com ID {item.peca_id} não encontrado no catálogo.",
+                )
+
+            if peca_estoque.quantidade_em_estoque < item.quantidade:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=(
+                        f"Saldo insuficiente no estoque para a peça '{peca_estoque.nome}'. "
+                        f"Necessário: {item.quantidade}, Disponível: {peca_estoque.quantidade_em_estoque}."
+                    ),
+                )
+
+            # Decrementa o saldo físico no estoque (baixa efetiva)
+            peca_estoque.quantidade_em_estoque -= item.quantidade
+
     async def executar(
         self,
         os_id: UUID,
@@ -58,45 +95,11 @@ class ResponderOrcamentoHandler:
 
         # 3. Lógica baseada na decisão (Aprovação ou Rejeição)
         if command.aprovado:
-            # --- BAIXA DE ESTOQUE COM LOCK PESSIMISTA ---
-            if os.itens_peca:
-                peca_ids = [item.peca_id for item in os.itens_peca]
-
-                # Executa select com FOR UPDATE para evitar Race Conditions
-                query_estoque = (
-                    select(PecaInsumo)
-                    .where(PecaInsumo.id.in_(peca_ids))
-                    .with_for_update()  # 🌟 LOCK PESSIMISTA ATIVO!
-                )
-                res_estoque = await self.db.execute(query_estoque)
-                pecas_db = {p.id: p for p in res_estoque.scalars().all()}
-
-                # Valida se as peças existem e se há estoque suficiente
-                for item in os.itens_peca:
-                    peca_estoque = pecas_db.get(item.peca_id)
-                    if not peca_estoque:
-                        raise HTTPException(
-                            status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Peça ou insumo com ID {item.peca_id} não encontrado no catálogo.",
-                        )
-
-                    if peca_estoque.quantidade_em_estoque < item.quantidade:
-                        raise HTTPException(
-                            status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=(
-                                f"Saldo insuficiente no estoque para a peça '{peca_estoque.nome}'. "
-                                f"Necessário: {item.quantidade}, Disponível: {peca_estoque.quantidade_em_estoque}."
-                            ),
-                        )
-
-                    # Decrementa o saldo físico no estoque (baixa efetiva)
-                    peca_estoque.quantidade_em_estoque -= item.quantidade
-
+            await self._processar_baixa_estoque(os)
             # Transiciona status: AGUARDANDO_APROVACAO -> EM_EXECUCAO
             log_status = os.alterar_status(
                 StatusOS.EM_EXECUCAO, operador_id=operador_id
             )
-
         else:
             # Transiciona status: AGUARDANDO_APROVACAO -> CANCELADA
             log_status = os.alterar_status(StatusOS.CANCELADA, operador_id=operador_id)
