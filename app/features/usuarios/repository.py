@@ -1,3 +1,4 @@
+from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.usuarios.models import Usuario
@@ -18,3 +19,14 @@ class UsuarioRepository:
         await self.db.commit()
         await self.db.refresh(usuario)
         return usuario
+
+    async def buscar_por_id(self, id: UUID) -> Usuario | None:
+        stmt = select(Usuario).where(Usuario.id == id)
+        res = await self.db.execute(stmt)
+        return res.scalar_one_or_none()
+
+    async def inativar(self, usuario: Usuario) -> None:
+        """
+        Executa a exclusao logica (Soft Delete) do operador no sistema.
+        """
+        usuario.ativo = False

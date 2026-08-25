@@ -1,10 +1,21 @@
 import pytest
+import base64
+import json
 from fastapi import status
 from httpx import AsyncClient
 from uuid import uuid7
 
 # Ajuste a URL caso o seu endpoint seja diferente (ex: "/operadores" ou "/v1/usuarios")
 ENDPOINT_USUARIOS = "/usuarios"
+
+
+def obter_id_do_token(token: str) -> str:
+    """Extrai o ID do usuario (campo 'sub') diretamente do payload do token JWT de forma robusta."""
+    payload_part = token.split(".")[1]
+    payload_part += "=" * ((4 - len(payload_part) % 4) % 4)
+    decoded_bytes = base64.urlsafe_b64decode(payload_part)
+    payload_data = json.loads(decoded_bytes)
+    return payload_data["sub"]
 
 
 @pytest.mark.asyncio
@@ -296,3 +307,82 @@ async def test_recepcionista_nao_deve_conseguir_consultar_operador(
     response = await async_client.get(f"/usuarios/{random_id}", headers=headers)
 
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_gerente_deve_inativar_outro_usuario_com_sucesso(
+    async_client: AsyncClient, token_gerente: str
+):
+    """
+    Cenario: O Gerente tenta inativar de forma logica (Soft Delete) outro operador do sistema.
+    Resultado esperado: 204 No Content, e o status 'ativo' do operador atualizado para False.
+    """
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    email_unico = f"temp.mecanico.{uuid7().hex[:6]}@mecanicar.com"
+
+    # 1. Cadastra novo operador de testes com e-mail exclusivo
+    payload_user = {
+        "nome": "Operador Temporario",
+        "email": email_unico,
+        "senha": "TempPassword123!",
+        "role": "MECANICO",
+    }
+    res_user = await async_client.post("/usuarios", json=payload_user, headers=headers)
+    assert res_user.status_code == status.HTTP_201_CREATED
+    user_id = res_user.json()["id"]
+
+    # 2. Inativa o usuario de forma logica (Soft Delete)
+    res_del = await async_client.delete(f"/usuarios/{user_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_204_NO_CONTENT
+
+    # 3. Consulta o operador para certificar que o status agora e 'ativo = False'
+    res_get = await async_client.get(f"/usuarios/{user_id}", headers=headers)
+    assert res_get.status_code == status.HTTP_200_OK
+    assert res_get.json()["ativo"] is False
+
+
+@pytest.mark.asyncio
+async def test_gerente_nao_deve_conseguir_inativar_a_si_proprio(
+    async_client: AsyncClient, token_gerente: str
+):
+    """
+    Cenario: Gerente tenta inativar a sua propria conta de usuario logado.
+    Resultado esperado: 400 Bad Request (regra de seguranca de integridade).
+    """
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    gerente_id = obter_id_do_token(token_gerente)
+
+    # Tenta excluir o proprio ID logado
+    res_del = await async_client.delete(f"/usuarios/{gerente_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Nao e permitido inativar a si proprio" in res_del.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_mecanico_nao_deve_conseguir_inativar_usuario(
+    async_client: AsyncClient, token_mecanico: str
+):
+    """
+    Cenario: Operador comum (Mecanico) tenta chamar a rota administrativa de inativacao.
+    Resultado esperado: 403 Forbidden pelo RBAC.
+    """
+    headers = {"Authorization": f"Bearer {token_mecanico}"}
+    id_qualquer = str(uuid7())
+
+    res_del = await async_client.delete(f"/usuarios/{id_qualquer}", headers=headers)
+    assert res_del.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_inativar_usuario_inexistente_deve_retornar_404(
+    async_client: AsyncClient, token_gerente: str
+):
+    """
+    Cenario: Gerente tenta inativar um ID de usuario inexistente no banco.
+    Resultado esperado: 404 Not Found.
+    """
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    id_inexistente = str(uuid7())
+
+    res_del = await async_client.delete(f"/usuarios/{id_inexistente}", headers=headers)
+    assert res_del.status_code == status.HTTP_404_NOT_FOUND
