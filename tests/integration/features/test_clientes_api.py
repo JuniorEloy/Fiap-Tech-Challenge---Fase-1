@@ -447,3 +447,95 @@ async def test_usuario_nao_autenticado_deve_receber_401_ao_editar_cliente(
     payload = {"nome": "Sem Token"}
     response = await async_client.put(f"/clientes/{uuid7()}", json=payload)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+@pytest.mark.asyncio
+async def test_gerente_deve_excluir_cliente_sem_vinculos_com_sucesso(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    cpf_valido = CPF().generate()  # 🌟 CPF matematicamente válido gerado sob demanda
+
+    # 1. Cadastra cliente de teste com dados válidos e e-mail único
+    payload_cliente = {
+        "nome": "Cliente Sem Vinculos",
+        "email": f"excluir.cliente.{uuid7().hex[:6]}@mecanicar.com",
+        "telefone": "11966665555",
+        "cpf_cnpj": cpf_valido,
+        "tipo_pessoa": "FISICA",
+    }
+    res_cli = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
+    assert res_cli.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cli.json()["id"]
+
+    # 2. Exclui o cliente cadastrado
+    res_del = await async_client.delete(f"/clientes/{cliente_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_204_NO_CONTENT
+
+    # 3. Garante que não é possível encontrar o cliente mais
+    res_get = await async_client.get(f"/clientes/{cliente_id}", headers=headers)
+    assert res_get.status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_deve_bloquear_exclusao_de_cliente_com_veiculo_vinculado(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    cpf_valido = (
+        CPF().generate()
+    )  # 🌟 Evita conflitos de unicidade com CPFs do seed (Marcos Lima)
+
+    # 1. Cadastra cliente de teste com e-mail único e CPF válido fresquinho
+    payload_cliente = {
+        "nome": "Cliente Proprietario",
+        "email": f"cliente.proprietario.{uuid7().hex[:6]}@mecanicar.com",
+        "telefone": "11955554444",
+        "cpf_cnpj": cpf_valido,
+        "tipo_pessoa": "FISICA",
+    }
+    res_cli = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
+    assert res_cli.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cli.json()["id"]
+
+    # 2. Cadastra veiculo para o cliente
+    payload_veiculo = {
+        "placa": "EXC1D24",
+        "marca": "Chevrolet",
+        "modelo": "Cruze",
+        "ano": 2020,
+        "cliente_id": cliente_id,
+    }
+    await async_client.post("/veiculos", json=payload_veiculo, headers=headers)
+
+    # 3. Tenta excluir o cliente que agora possui vínculo físico
+    res_del = await async_client.delete(f"/clientes/{cliente_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_400_BAD_REQUEST
+    assert "possui veiculos ou ordens de servico vinculadas" in res_del.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_mecanico_nao_deve_excluir_cliente(
+    async_client: AsyncClient, token_mecanico: str
+):
+    headers = {"Authorization": f"Bearer {token_mecanico}"}
+    cliente_id = str(uuid7())
+
+    # Tenta excluir o cliente sem possuir permissão RBAC (apenas GERENTE)
+    res_del = await async_client.delete(f"/clientes/{cliente_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_excluir_cliente_inexistente_deve_retornar_404(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    id_inexistente = str(uuid7())
+
+    res_del = await async_client.delete(f"/clientes/{id_inexistente}", headers=headers)
+    assert res_del.status_code == status.HTTP_404_NOT_FOUND
