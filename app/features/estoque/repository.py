@@ -2,6 +2,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.features.estoque.models import PecaInsumo
+from app.features.ordens_servico.models import ItemPecaOS
 
 
 class EstoqueRepository:
@@ -34,6 +35,17 @@ class EstoqueRepository:
         query = select(PecaInsumo).where(PecaInsumo.id == peca_id).with_for_update()
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
+
+    async def esta_vinculada_a_ordens(self, peca_id: UUID) -> bool:
+        """
+        Garante que a peca nao foi utilizada em nenhum lancamento de pecas de OS.
+        """
+        stmt = select(ItemPecaOS).where(ItemPecaOS.peca_id == peca_id)
+        res = await self.db.execute(stmt)
+        return res.scalars().first() is not None
+
+    async def excluir(self, peca: PecaInsumo) -> None:
+        await self.db.delete(peca)
 
     async def salvar(self, peca: PecaInsumo) -> PecaInsumo:
         """Persiste ou atualiza a entidade de estoque."""

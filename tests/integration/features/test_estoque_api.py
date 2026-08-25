@@ -1,9 +1,19 @@
-# tests/integration/features/test_cadastrar_peca.py
 import pytest
 from fastapi import status
 from httpx import AsyncClient
-import asyncio
 from uuid import uuid7
+from validate_docbr import CPF
+import random
+import string
+
+
+def gerar_placa_valida_para_teste() -> str:
+    """Gera uma placa Mercosul válida e aleatória (formato AAA9A99) para evitar colisões cadastrais."""
+    letras_aleatorias_1 = "".join(random.choices(string.ascii_uppercase, k=3))
+    numero_1 = str(random.randint(0, 9))
+    letra_aleatoria_2 = random.choice(string.ascii_uppercase)
+    numeros_finais = "".join(random.choices(string.digits, k=2))
+    return f"{letras_aleatorias_1}{numero_1}{letra_aleatoria_2}{numeros_finais}"
 
 
 @pytest.mark.asyncio
@@ -376,3 +386,140 @@ async def test_mecanico_nao_deve_ter_acesso_ao_relatorio_de_estoque_baixo(
     headers = {"Authorization": f"Bearer {token_mecanico}"}
     response = await async_client.get("/estoque/relatorios/baixo", headers=headers)
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_gerente_deve_excluir_peca_sem_vinculos_com_sucesso(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+
+    # 1. Cadastra nova peça no estoque para exclusão com nome único
+    payload_peca = {
+        "nome": f"Peca Temporaria {uuid7().hex[:6]}",
+        "descricao": "Filtro temporario para testes",
+        "preco_custo": 10.00,
+        "preco_venda": 25.00,
+        "quantidade_em_estoque": 50,
+        "limite_minimo": 10,
+    }
+    res_pec = await async_client.post("/estoque", json=payload_peca, headers=headers)
+    assert res_pec.status_code == status.HTTP_201_CREATED
+    peca_id = res_pec.json()["id"]
+
+    # 2. Remove a peça cadastrada
+    res_del = await async_client.delete(f"/estoque/{peca_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_204_NO_CONTENT
+
+
+@pytest.mark.asyncio
+async def test_deve_bloquear_exclusao_de_peca_ja_utilizada_em_ordens_servico(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    cpf_valido = CPF().generate()
+
+    # 1. Cadastra uma nova peça com nome exclusivo
+    payload_peca = {
+        "nome": f"Filtro Fram Vinculado {uuid7().hex[:6]}",
+        "descricao": "Filtro blindado de oleo",
+        "preco_custo": 15.00,
+        "preco_venda": 35.00,
+        "quantidade_em_estoque": 20,
+        "limite_minimo": 10,
+    }
+    res_pec = await async_client.post("/estoque", json=payload_peca, headers=headers)
+    assert res_pec.status_code == status.HTTP_201_CREATED
+    peca_id = res_pec.json()["id"]
+
+    # 2. Cria cliente e veículo para abrir a OS
+    payload_cliente = {
+        "nome": "Marcos Pecas",
+        "email": f"marcos.pecas.{uuid7().hex[:6]}@mecanicar.com",
+        "telefone": "11977776666",
+        "cpf_cnpj": cpf_valido,
+        "tipo_pessoa": "FISICA",
+    }
+    res_cli = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
+    assert res_cli.status_code == status.HTTP_201_CREATED
+    cliente_id = res_cli.json()["id"]
+
+    payload_veiculo = {
+        "placa": gerar_placa_valida_para_teste(),
+        "marca": "Toyota",
+        "modelo": "Etios",
+        "ano": 2018,
+        "cliente_id": cliente_id,
+    }
+    res_vei = await async_client.post(
+        "/veiculos", json=payload_veiculo, headers=headers
+    )
+    assert res_vei.status_code == status.HTTP_201_CREATED
+    veiculo_id = res_vei.json()["id"]
+
+    # 3. Abre uma OS padrão (fará check-in no status inicial EM_DIAGNOSTICO)
+    payload_os = {
+        "cliente_id": cliente_id,
+        "veiculo_id": veiculo_id,
+        "servicos_solicitados": [],
+        "pecas_solicitadas": [],
+    }
+    res_os = await async_client.post(
+        "/ordens-servico", json=payload_os, headers=headers
+    )
+    assert res_os.status_code == status.HTTP_201_CREATED
+    os_id = res_os.json()["id"]
+
+    # 4. Cadastra um serviço de mão de obra para utilizar no diagnóstico
+    payload_servico = {
+        "nome": f"Revisao Mecanica Geral {uuid7().hex[:6]}",
+        "descricao": "Inspecao detalhada de itens de suspensao e motor",
+        "preco_mao_de_obra": 100.00,
+        "duracao_estimada_minutos": 45,
+    }
+    res_ser = await async_client.post(
+        "/servicos", json=payload_servico, headers=headers
+    )
+    assert res_ser.status_code == status.HTTP_201_CREATED
+    servico_id = res_ser.json()["id"]
+
+    # 5. Lança o laudo técnico do diagnóstico vinculando a peça cadastrada
+    payload_diagnostico = {
+        "servicos": [{"servico_id": servico_id}],
+        "pecas": [{"peca_id": peca_id, "quantidade": 1}],
+    }
+    res_diag = await async_client.put(
+        f"/ordens-servico/{os_id}/diagnostico",
+        json=payload_diagnostico,
+        headers=headers,
+    )
+    assert res_diag.status_code == status.HTTP_200_OK
+
+    # 6. Tenta remover a peça do estoque que agora possui vínculo transacional ativo
+    res_del = await async_client.delete(f"/estoque/{peca_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_400_BAD_REQUEST
+    assert "ja foi utilizada em ordens de servico" in res_del.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_estoquista_nao_deve_excluir_pecas_do_catalogo(
+    async_client: AsyncClient, token_estoquista: str
+):
+    headers = {"Authorization": f"Bearer {token_estoquista}"}
+    peca_id = str(uuid7())
+
+    res_del = await async_client.delete(f"/estoque/{peca_id}", headers=headers)
+    assert res_del.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_excluir_peca_inexistente_deve_retornar_404(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    id_inexistente = str(uuid7())
+
+    res_del = await async_client.delete(f"/estoque/{id_inexistente}", headers=headers)
+    assert res_del.status_code == status.HTTP_404_NOT_FOUND

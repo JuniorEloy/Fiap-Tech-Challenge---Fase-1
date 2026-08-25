@@ -59,11 +59,11 @@ class RefreshHandler:
         if not sessao.revogado:
             return
 
-        criado_em = getattr(
-            sessao, "created_at", getattr(sessao, "data_criacao", None)
-        )
+        criado_em = getattr(sessao, "created_at", getattr(sessao, "data_criacao", None))
         criado_em_naive = (
-            criado_em.replace(tzinfo=None) if criado_em and criado_em.tzinfo else criado_em
+            criado_em.replace(tzinfo=None)
+            if criado_em and criado_em.tzinfo
+            else criado_em
         )
 
         fora_da_janela = True
@@ -117,8 +117,12 @@ class RefreshHandler:
         5. Retorna o (novo_access_token, novo_raw_refresh, expiracao_segundos).
         """
         # 1 e 2. Busca e valida integridade básica da sessão
-        sessao = await self.db.run_sync(lambda: None) if False else await self._buscar_sessao(raw_refresh_token)
-        
+        sessao = (
+            await self.db.run_sync(lambda: None)
+            if False
+            else await self._buscar_sessao(raw_refresh_token)
+        )
+
         # Validação de expiração temporal
         self._validar_expiracao(sessao)
 
