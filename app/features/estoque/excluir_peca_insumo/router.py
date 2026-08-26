@@ -8,21 +8,20 @@ from app.shared.security.dependencies import requer_roles
 from app.shared.security.roles import Role
 from app.features.estoque.repository import EstoqueRepository
 from app.features.estoque.excluir_peca_insumo.handler import ExcluirPecaHandler
+from app.features.estoque.excluir_peca_insumo.schemas import ExcluirPecaResponse
 from app.features.usuarios.models import Usuario
 
 router = APIRouter(prefix="/estoque", tags=["Estoque"])
 
 
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{id}", response_model=ExcluirPecaResponse, status_code=status.HTTP_200_OK
+)
 async def excluir_peca(
     id: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[Usuario, Depends(requer_roles([Role.GERENTE]))],
 ):
-    """
-    Remove uma peca ou insumo do catalogo de estoque.
-    Operacao restrita ao papel de GERENTE. Protege o historico financeiro impedindo a remocao de pecas ja faturadas.
-    """
     repository = EstoqueRepository(db)
     handler = ExcluirPecaHandler(repository)
-    await handler.executar(id)
+    return await handler.executar(id)

@@ -394,7 +394,7 @@ async def test_gerente_deve_excluir_peca_sem_vinculos_com_sucesso(
 ):
     headers = {"Authorization": f"Bearer {token_gerente}"}
 
-    # 1. Cadastra nova peça no estoque para exclusão com nome único
+    # 1. Cadastra nova peca no estoque para exclusao com nome unico
     payload_peca = {
         "nome": f"Peca Temporaria {uuid7().hex[:6]}",
         "descricao": "Filtro temporario para testes",
@@ -407,19 +407,25 @@ async def test_gerente_deve_excluir_peca_sem_vinculos_com_sucesso(
     assert res_pec.status_code == status.HTTP_201_CREATED
     peca_id = res_pec.json()["id"]
 
-    # 2. Remove a peça cadastrada
+    # 2. Remove a peca cadastrada (Retorna 200 OK com Schema)
     res_del = await async_client.delete(f"/estoque/{peca_id}", headers=headers)
-    assert res_del.status_code == status.HTTP_204_NO_CONTENT
+    assert res_del.status_code == status.HTTP_200_OK
+
+    body = res_del.json()
+    assert body["peca_id"] == peca_id
+    assert "Peca Temporaria" in body["nome"]
+    assert "removida com sucesso" in body["mensagem"]
 
 
 @pytest.mark.asyncio
 async def test_deve_bloquear_exclusao_de_peca_ja_utilizada_em_ordens_servico(
-    async_client: AsyncClient, token_gerente: str
+    async_client: AsyncClient, token_gerente: str, token_mecanico: str
 ):
     headers = {"Authorization": f"Bearer {token_gerente}"}
+    headers_mec = {"Authorization": f"Bearer {token_mecanico}"}
     cpf_valido = CPF().generate()
 
-    # 1. Cadastra uma nova peça com nome exclusivo
+    # 1. Cadastra uma nova peca com nome exclusivo
     payload_peca = {
         "nome": f"Filtro Fram Vinculado {uuid7().hex[:6]}",
         "descricao": "Filtro blindado de oleo",
@@ -432,7 +438,7 @@ async def test_deve_bloquear_exclusao_de_peca_ja_utilizada_em_ordens_servico(
     assert res_pec.status_code == status.HTTP_201_CREATED
     peca_id = res_pec.json()["id"]
 
-    # 2. Cria cliente e veículo para abrir a OS
+    # 2. Cria cliente, veiculo e OS
     payload_cliente = {
         "nome": "Marcos Pecas",
         "email": f"marcos.pecas.{uuid7().hex[:6]}@mecanicar.com",
@@ -459,7 +465,7 @@ async def test_deve_bloquear_exclusao_de_peca_ja_utilizada_em_ordens_servico(
     assert res_vei.status_code == status.HTTP_201_CREATED
     veiculo_id = res_vei.json()["id"]
 
-    # 3. Abre uma OS padrão (fará check-in no status inicial EM_DIAGNOSTICO)
+    # Abre a OS vazia (status EM_DIAGNOSTICO)
     payload_os = {
         "cliente_id": cliente_id,
         "veiculo_id": veiculo_id,
@@ -472,32 +478,28 @@ async def test_deve_bloquear_exclusao_de_peca_ja_utilizada_em_ordens_servico(
     assert res_os.status_code == status.HTTP_201_CREATED
     os_id = res_os.json()["id"]
 
-    # 4. Cadastra um serviço de mão de obra para utilizar no diagnóstico
-    payload_servico = {
-        "nome": f"Revisao Mecanica Geral {uuid7().hex[:6]}",
-        "descricao": "Inspecao detalhada de itens de suspensao e motor",
-        "preco_mao_de_obra": 100.00,
-        "duracao_estimada_minutos": 45,
+    # 3. Cadastra servico de teste no catalogo para fechar o laudo tecnico
+    payload_serv = {
+        "nome": f"Troca de Filtros {uuid7().hex[:6]}",
+        "descricao": "Substituicao de filtros de cabine e motor",
+        "preco_mao_de_obra": 60.00,
+        "duracao_estimada_minutos": 20,
     }
-    res_ser = await async_client.post(
-        "/servicos", json=payload_servico, headers=headers
-    )
-    assert res_ser.status_code == status.HTTP_201_CREATED
-    servico_id = res_ser.json()["id"]
+    res_serv = await async_client.post("/servicos", json=payload_serv, headers=headers)
+    assert res_serv.status_code == status.HTTP_201_CREATED
+    servico_id = res_serv.json()["id"]
 
-    # 5. Lança o laudo técnico do diagnóstico vinculando a peça cadastrada
-    payload_diagnostico = {
+    # 4. Mecanico lanca o laudo tecnico contendo a peca, gerando o vinculo real
+    payload_diag = {
         "servicos": [{"servico_id": servico_id}],
         "pecas": [{"peca_id": peca_id, "quantidade": 1}],
     }
     res_diag = await async_client.put(
-        f"/ordens-servico/{os_id}/diagnostico",
-        json=payload_diagnostico,
-        headers=headers,
+        f"/ordens-servico/{os_id}/diagnostico", json=payload_diag, headers=headers_mec
     )
     assert res_diag.status_code == status.HTTP_200_OK
 
-    # 6. Tenta remover a peça do estoque que agora possui vínculo transacional ativo
+    # 5. Tenta remover a peca do estoque que agora possui vinculo transacional
     res_del = await async_client.delete(f"/estoque/{peca_id}", headers=headers)
     assert res_del.status_code == status.HTTP_400_BAD_REQUEST
     assert "ja foi utilizada em ordens de servico" in res_del.json()["detail"]
