@@ -454,51 +454,49 @@ async def test_gerente_deve_excluir_cliente_sem_vinculos_com_sucesso(
     async_client: AsyncClient, token_gerente: str
 ):
     headers = {"Authorization": f"Bearer {token_gerente}"}
-    cpf_valido = CPF().generate()  # 🌟 CPF matematicamente válido gerado sob demanda
+    cpf_valido = CPF().generate()
 
-    # 1. Cadastra cliente de teste com dados válidos e e-mail único
+    # 1. Cadastra cliente de teste com e-mail unico e CPF valido
     payload_cliente = {
         "nome": "Cliente Sem Vinculos",
         "email": f"excluir.cliente.{uuid7().hex[:6]}@mecanicar.com",
         "telefone": "11966665555",
         "cpf_cnpj": cpf_valido,
-        "tipo_pessoa": "FISICA",
+        "tipo_pessoa": "FISICA"
     }
-    res_cli = await async_client.post(
-        "/clientes", json=payload_cliente, headers=headers
-    )
+    res_cli = await async_client.post("/clientes", json=payload_cliente, headers=headers)
     assert res_cli.status_code == status.HTTP_201_CREATED
     cliente_id = res_cli.json()["id"]
 
-    # 2. Exclui o cliente cadastrado
+    # 2. Exclui o cliente cadastrado (Retorna 200 OK com Schema)
     res_del = await async_client.delete(f"/clientes/{cliente_id}", headers=headers)
-    assert res_del.status_code == status.HTTP_204_NO_CONTENT
+    assert res_del.status_code == status.HTTP_200_OK
+    
+    body = res_del.json()
+    assert body["cliente_id"] == cliente_id
+    assert body["nome"] == "Cliente Sem Vinculos"
+    assert "removido com sucesso" in body["mensagem"]
 
-    # 3. Garante que não é possível encontrar o cliente mais
+    # 3. Garante que nao e possivel encontrar o cliente mais
     res_get = await async_client.get(f"/clientes/{cliente_id}", headers=headers)
     assert res_get.status_code == status.HTTP_404_NOT_FOUND
-
 
 @pytest.mark.asyncio
 async def test_deve_bloquear_exclusao_de_cliente_com_veiculo_vinculado(
     async_client: AsyncClient, token_gerente: str
 ):
     headers = {"Authorization": f"Bearer {token_gerente}"}
-    cpf_valido = (
-        CPF().generate()
-    )  # 🌟 Evita conflitos de unicidade com CPFs do seed (Marcos Lima)
+    cpf_valido = CPF().generate()
 
-    # 1. Cadastra cliente de teste com e-mail único e CPF válido fresquinho
+    # 1. Cadastra cliente de teste com e-mail unico e CPF valido
     payload_cliente = {
         "nome": "Cliente Proprietario",
         "email": f"cliente.proprietario.{uuid7().hex[:6]}@mecanicar.com",
         "telefone": "11955554444",
         "cpf_cnpj": cpf_valido,
-        "tipo_pessoa": "FISICA",
+        "tipo_pessoa": "FISICA"
     }
-    res_cli = await async_client.post(
-        "/clientes", json=payload_cliente, headers=headers
-    )
+    res_cli = await async_client.post("/clientes", json=payload_cliente, headers=headers)
     assert res_cli.status_code == status.HTTP_201_CREATED
     cliente_id = res_cli.json()["id"]
 
@@ -508,15 +506,14 @@ async def test_deve_bloquear_exclusao_de_cliente_com_veiculo_vinculado(
         "marca": "Chevrolet",
         "modelo": "Cruze",
         "ano": 2020,
-        "cliente_id": cliente_id,
+        "cliente_id": cliente_id
     }
     await async_client.post("/veiculos", json=payload_veiculo, headers=headers)
 
-    # 3. Tenta excluir o cliente que agora possui vínculo físico
+    # 3. Tenta excluir o cliente que agora possui vinculo fisico
     res_del = await async_client.delete(f"/clientes/{cliente_id}", headers=headers)
     assert res_del.status_code == status.HTTP_400_BAD_REQUEST
     assert "possui veiculos ou ordens de servico vinculadas" in res_del.json()["detail"]
-
 
 @pytest.mark.asyncio
 async def test_mecanico_nao_deve_excluir_cliente(
@@ -525,10 +522,8 @@ async def test_mecanico_nao_deve_excluir_cliente(
     headers = {"Authorization": f"Bearer {token_mecanico}"}
     cliente_id = str(uuid7())
 
-    # Tenta excluir o cliente sem possuir permissão RBAC (apenas GERENTE)
     res_del = await async_client.delete(f"/clientes/{cliente_id}", headers=headers)
     assert res_del.status_code == status.HTTP_403_FORBIDDEN
-
 
 @pytest.mark.asyncio
 async def test_excluir_cliente_inexistente_deve_retornar_404(

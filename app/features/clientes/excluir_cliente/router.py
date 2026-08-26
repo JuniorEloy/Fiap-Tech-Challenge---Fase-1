@@ -8,21 +8,21 @@ from app.shared.security.dependencies import requer_roles
 from app.shared.security.roles import Role
 from app.features.clientes.repository import ClienteRepository
 from app.features.clientes.excluir_cliente.handler import ExcluirClienteHandler
+from app.features.clientes.excluir_cliente.schemas import ExcluirClienteResponse
 from app.features.usuarios.models import Usuario
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
-
-@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{id}",
+    response_model=ExcluirClienteResponse,
+    status_code=status.HTTP_200_OK
+)
 async def excluir_cliente(
     id: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[Usuario, Depends(requer_roles([Role.GERENTE]))],
+    current_user: Annotated[Usuario, Depends(requer_roles([Role.GERENTE]))]
 ):
-    """
-    Exclui um cliente cadastrado do sistema de forma fisica.
-    Operacao restrita ao papel de GERENTE. Bloqueia a exclusao caso existam vinculos ativos.
-    """
     repository = ClienteRepository(db)
     handler = ExcluirClienteHandler(repository)
-    await handler.executar(id)
+    return await handler.executar(id)
