@@ -117,11 +117,7 @@ class RefreshHandler:
         5. Retorna o (novo_access_token, novo_raw_refresh, expiracao_segundos).
         """
         # 1 e 2. Busca e valida integridade básica da sessão
-        sessao = (
-            await self.db.run_sync(lambda: None)
-            if False
-            else await self._buscar_sessao(raw_refresh_token)
-        )
+        sessao = await self._buscar_sessao(raw_refresh_token)
 
         # Validação de expiração temporal
         self._validar_expiracao(sessao)

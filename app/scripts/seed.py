@@ -50,6 +50,8 @@ from app.features.ordens_servico.models import (
     ItemPecaOS,
 )
 
+MSG_TROCA_DE_OLEO_E_FILTRO = "Troca de Óleo e Filtros"
+MSG_ALINHAMENTO_BALANCEAMENTO_3D = "Alinhamento e Balanceamento 3D"
 
 async def semear_banco():
     print(
@@ -335,13 +337,13 @@ async def semear_banco():
 
             servicos_dados = [
                 {
-                    "nome": "Troca de Óleo e Filtros",
+                    "nome": MSG_TROCA_DE_OLEO_E_FILTRO,
                     "descricao": "Substituição completa do lubrificante e do filtro correspondente",
                     "preco_mao_de_obra": Decimal("60.00"),
                     "duracao_estimada_minutos": 20,
                 },
                 {
-                    "nome": "Alinhamento e Balanceamento 3D",
+                    "nome": MSG_ALINHAMENTO_BALANCEAMENTO_3D,
                     "descricao": "Regulagem computadorizada de suspensão e balanceamento dinâmico de rodas",
                     "preco_mao_de_obra": Decimal("120.00"),
                     "duracao_estimada_minutos": 45,
@@ -368,8 +370,8 @@ async def semear_banco():
                 if not servico_db:
                     # Garante que permite_servico_expresso seja True para o serviço rápido
                     permite_expresso = ser["nome"] in [
-                        "Troca de Óleo e Filtros",
-                        "Alinhamento e Balanceamento 3D",
+                        MSG_TROCA_DE_OLEO_E_FILTRO,
+                        MSG_ALINHAMENTO_BALANCEAMENTO_3D,
                     ]
 
                     novo_servico = ServicoBase(
@@ -444,7 +446,7 @@ async def semear_banco():
             if ItemServicoOS and ItemPecaOS:
                 os1_servico = ItemServicoOS(
                     ordem_servico_id=os1_id,
-                    servico_base_id=servicos_dict["Troca de Óleo e Filtros"].id,
+                    servico_base_id=servicos_dict[MSG_TROCA_DE_OLEO_E_FILTRO].id,
                     preco_aplicado=Decimal("60.00"),
                     duracao_minutos=20,
                 )
@@ -619,7 +621,7 @@ async def semear_banco():
             if ItemServicoOS and ItemPecaOS:
                 os3_servico = ItemServicoOS(
                     ordem_servico_id=os3_id,
-                    servico_base_id=servicos_dict["Alinhamento e Balanceamento 3D"].id,
+                    servico_base_id=servicos_dict[MSG_ALINHAMENTO_BALANCEAMENTO_3D].id,
                     preco_aplicado=Decimal("120.00"),
                     duracao_minutos=45,
                 )
@@ -679,7 +681,7 @@ async def semear_banco():
             if ItemServicoOS and ItemPecaOS:
                 os4_servico = ItemServicoOS(
                     ordem_servico_id=os4_id,
-                    servico_base_id=servicos_dict["Alinhamento e Balanceamento 3D"].id,
+                    servico_base_id=servicos_dict[MSG_ALINHAMENTO_BALANCEAMENTO_3D].id,
                     preco_aplicado=Decimal("120.00"),
                     duracao_minutos=45,
                 )

@@ -1,4 +1,4 @@
-# Mecanicar - Sistema Integrado de Gestao Automotiva (Fase 1)
+# Mecanicar - Sistema Integrado de Gestao Automotiva
 
 O Mecanicar e um ecossistema digital corporativo desenvolvido sob medida para uma oficina mecanica de medio porte situada no interior paulista. O projeto representa a entrega da Fase 1 do Tech Challenge, englobando desde a descoberta tatica de dominio ate a implementacao de um ecossistema robusto, seguro, testado e conteinerizado.
 
@@ -42,7 +42,7 @@ O ecossistema foi mapeado em contextos limpos com fronteiras de codigo e modelos
 
 ## 2. Escolha Arquitetural e Modelagem de Componentes
 
-### O Desvio da Clean Architecture para o Feature-Sliced Design
+### A decisão de arquitetura Feature-Sliced Design
 Durante o desenvolvimento do Mecanicar, optamos conscientemente por nao utilizar a Clean Architecture tradicional, escolhendo em seu lugar o Feature-Sliced Design (Arquitetura por Slices de Funcionalidades ou Monolito Modular). 
 
 Os motivadores para essa decisao sao de ordem estrategica e de engenharia de software:
@@ -101,7 +101,7 @@ O codigo fonte do Mecanicar e verificado de forma continua para alcancar conform
 
 ---
 
-## 6. Guia de Inicializacao Rapida PROD (Quick Start)
+## 6. Guia de Inicializacao Rapida (Quick Start)
 
 Coloque toda a aplicacao, o banco de dados e a massa de testes de producao em execucao local em um unico comando.
 
@@ -123,21 +123,55 @@ docker compose up --build
 
 ---
 
-## 7. Guia de Inicializacao Rapida TEST (Quick Start)
+## 7. Guia de Inicializacao do Ambiente de Testes (Test Quick Start)
 
-docker compose -f docker-compose.test.yml up -d
+Configure e execute toda a suite de testes locais (unitarios e integracao) acompanhados dos relatorios de cobertura de codigo dentro de um ambiente de testes totalmente isolado.
 
-APP_ENV=test alembic upgrade head
-APP_ENV=test uv run python app/scripts/seed.py
+### Requisitos Necessarios
+- Docker instalado e ativo.
+- Gerenciador de pacotes `uv` configurado.
 
-APP_ENV=test uv run pytest --cov=app --cov-report=term-missing     
-APP_ENV=test uv run pytest
-APP_ENV=test uv run pytest --junitxml=report.xml
-coverage xml -i
+### Como Inicializar o Ambiente
+Abra o seu terminal na pasta raiz do projeto e execute os passos a seguir:
+
+1. **Subir o banco de dados PostgreSQL exclusivo de testes:**
+   ```bash
+   docker compose -f docker-compose.test.yml up -d
+   ```
+
+2. **Instalar e sincronizar as dependencias do projeto via `uv`:**
+   ```bash
+   uv sync
+   ```
+
+3. **Executar as migracoes do Alembic no banco de testes:**
+   ```bash
+   APP_ENV=test uv run alembic upgrade head
+   ```
+
+4. **Popular a base de testes com as massas estruturadas de sementes:**
+   ```bash
+   APP_ENV=test uv run python app/scripts/seed.py
+   ```
+
+### Como Executar as Suites de Testes
+
+Escolha uma das instrucoes abaixo de acordo com a sua necessidade de analise:
+
+- **Executar testes exibindo a cobertura completa com linhas nao cobertas:**
+  ```bash
+   APP_ENV=test uv run pytest --cov=app --cov-report=term-missing
+   APP_ENV=test uv run coverage xml -I
+  ```
+
+- **Executar a suite de testes rapida de forma tradicional:**
+  ```bash
+  APP_ENV=test uv run pytest
+  ```
 
 ---
 
-## 8. Credenciais de Testes e Massa de Dados
+## 8. Credenciais de Testes e Massa de Dados (Seed v4)
 
 Utilize os usuarios cadastrados pelo seeder automatico para simular o acesso baseado em papeis (RBAC):
 
@@ -147,3 +181,13 @@ Utilize os usuarios cadastrados pelo seeder automatico para simular o acesso bas
 | Barbara Silva | barbara.recepcao@oficina.com | Recepcao123! | RECEPCIONISTA | Cadastro base de clientes, veiculos e abertura inicial de OSs no patio. |
 | Roberto Santos | roberto.mecanico@oficina.com | Mecanico123! | MECANICO | Acesso a ordens de servico, preenchimento de diagnostico e execucao. |
 | Denilson Souza | denilson.estoque@oficina.com | Estoque123! | ESTOQUISTA | Controle fisico de inventario de pecas e entrada de notas de compras. |
+
+### Portal do Cliente (Teste Publico do WhatsApp)
+Para testar a decisao do cliente de forma autonoma e sem necessidade de tokens JWT de operadores internos:
+
+1. Acesse a pagina interativa do Swagger: http://localhost:8000/docs
+2. Locate a rota publica de aprovacao: POST /ordens-servico/publica/{hash}/responder
+3. Forneca o UUID de visualizacao estatico gerado automaticamente pelo seeder v4:
+   019f3a5b-7c10-7000-8000-000000000001
+4. Envie o JSON de resposta (exemplo: {"aprovado": true, "observacoes_cliente": "Servico aprovado!"}).
+5. O sistema realizara a baixa fisica automatica de estoque das pecas correspondentes sob bloqueio pessimista e movera o veiculo para EM_EXECUCAO de forma transacional e integrada.

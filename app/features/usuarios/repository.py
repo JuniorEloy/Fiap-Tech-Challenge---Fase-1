@@ -30,3 +30,5 @@ class UsuarioRepository:
         Executa a exclusao logica (Soft Delete) do operador no sistema.
         """
         usuario.ativo = False
+        self.db.add(usuario)
+        await self.db.flush() 
