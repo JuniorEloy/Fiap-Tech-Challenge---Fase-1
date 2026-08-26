@@ -409,3 +409,65 @@ async def test_estoquista_nao_deve_conseguir_listar_servicos(
     headers = {"Authorization": f"Bearer {token_estoquista}"}
     response = await async_client.get("/servicos", headers=headers)
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_gerente_deve_conseguir_desativar_servico_com_sucesso(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+
+    # 1. Cadastra o servico base com nome exclusivo para evitar colisoes
+    payload_cad = {
+        "nome": f"Limpeza de Injetores GDI {uuid7().hex[:6]}",
+        "descricao": "Servico especializado de limpeza por ultrassom de bicos de injecao direta",
+        "preco_mao_de_obra": 380.00,
+        "duracao_estimada_minutos": 120,
+    }
+    res_cad = await async_client.post("/servicos", json=payload_cad, headers=headers)
+    assert res_cad.status_code == status.HTTP_201_CREATED
+    servico_id = res_cad.json()["id"]
+
+    # 2. Gerente executa a desativacao logica (Retorna 200 OK com Schema)
+    response = await async_client.delete(f"/servicos/{servico_id}", headers=headers)
+    assert response.status_code == status.HTTP_200_OK
+
+    body = response.json()
+    assert body["servico_id"] == servico_id
+    assert "Limpeza de Injetores GDI" in body["nome"]
+    assert body["ativo"] is False
+    assert "desativado com sucesso" in body["mensagem"]
+
+
+@pytest.mark.asyncio
+async def test_recepcionista_nao_deve_conseguir_excluir_servico(
+    async_client: AsyncClient, token_recepcionista: str
+):
+    headers = {"Authorization": f"Bearer {token_recepcionista}"}
+    random_uuid = str(uuid7())
+
+    response = await async_client.delete(f"/servicos/{random_uuid}", headers=headers)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_mecanico_nao_deve_conseguir_excluir_servico(
+    async_client: AsyncClient, token_mecanico: str
+):
+    headers = {"Authorization": f"Bearer {token_mecanico}"}
+    random_uuid = str(uuid7())
+
+    response = await async_client.delete(f"/servicos/{random_uuid}", headers=headers)
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.asyncio
+async def test_excluir_servico_inexistente_deve_retornar_404(
+    async_client: AsyncClient, token_gerente: str
+):
+    headers = {"Authorization": f"Bearer {token_gerente}"}
+    random_uuid = str(uuid7())
+
+    response = await async_client.delete(f"/servicos/{random_uuid}", headers=headers)
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Serviço não encontrado no catálogo da oficina."

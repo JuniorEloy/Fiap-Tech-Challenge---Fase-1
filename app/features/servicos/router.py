@@ -12,6 +12,9 @@ from app.features.servicos.editar_servico.router import (
 from app.features.servicos.listar_servico.router import (
     router as listar_servico_router,
 )
+from app.features.servicos.excluir_servico.router import (
+    router as excluir_servico_router,
+)
 
 servico_router = APIRouter()
 
@@ -20,3 +23,4 @@ servico_router.include_router(cadastrar_servico_router)
 servico_router.include_router(consultar_servico_router)
 servico_router.include_router(editar_servico_router)
 servico_router.include_router(listar_servico_router)
+servico_router.include_router(excluir_servico_router)
