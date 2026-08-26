@@ -10,8 +10,8 @@ from app.features.servicos.repository import ServicosRepository
 from app.features.servicos.cadastrar_servico.handler import CadastrarServicoHandler
 from app.features.servicos.cadastrar_servico.schemas import (
     CadastrarServicoRequest,
-    ServicoResponse,
 )
+from app.features.servicos.schemas import ServicoResponse
 
 router = APIRouter(prefix="/servicos", tags=["Gestão de Serviços"])
 

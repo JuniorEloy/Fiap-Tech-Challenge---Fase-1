@@ -8,7 +8,7 @@ from app.shared.security.roles import Role
 
 from app.features.servicos.repository import ServicosRepository
 from app.features.servicos.listar_servico.handler import ListarServicosHandler
-from app.features.servicos.listar_servico.schemas import ServicoResponse
+from app.features.servicos.schemas import ServicoResponse
 
 router = APIRouter(prefix="/servicos", tags=["Gestão de Serviços"])
 

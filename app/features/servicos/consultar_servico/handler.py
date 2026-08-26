@@ -1,7 +1,7 @@
 from uuid import UUID
 from fastapi import HTTPException, status
 from app.features.servicos.repository import ServicosRepository
-from app.features.servicos.cadastrar_servico.schemas import ServicoResponse
+from app.features.servicos.schemas import ServicoResponse
 
 
 class ConsultarServicoHandler:
