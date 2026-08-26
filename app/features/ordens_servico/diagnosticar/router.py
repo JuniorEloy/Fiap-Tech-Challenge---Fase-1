@@ -15,6 +15,8 @@ from app.features.ordens_servico.diagnosticar.schemas import (
     LancarDiagnosticoRequest,
     OrdemServicoResponse,
 )
+from app.shared.infra.dependencies import obter_notificador_whatsapp
+from app.shared.domain.ports.notificacao import EnviadorNotificacaoPort
 
 router = APIRouter(prefix="/ordens-servico", tags=["Gestão de Ordens de Serviço"])
 
@@ -29,6 +31,9 @@ async def lancar_diagnostico_tecnico(
     id: UUID,
     payload: LancarDiagnosticoRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
+    notificador: Annotated[
+        EnviadorNotificacaoPort, Depends(obter_notificador_whatsapp)
+    ],
     operador_atual: Annotated[UsuarioToken, Depends(obter_usuario_atual)],
 ):
     """
@@ -37,7 +42,7 @@ async def lancar_diagnostico_tecnico(
     A OS é transicionada para 'AGUARDANDO_APROVACAO' (notificação enviada ao cliente).
     Acesso autorizado apenas para MECÂNICO ou GERENTE.
     """
-    handler = LancarDiagnosticoHandler(db)
+    handler = LancarDiagnosticoHandler(db, notificacao_service=notificador)
     return await handler.executar(
         os_id=id, command=payload, mecanico_id=operador_atual.id
     )

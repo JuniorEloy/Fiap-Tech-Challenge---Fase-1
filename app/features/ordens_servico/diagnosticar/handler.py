@@ -17,12 +17,15 @@ from app.features.ordens_servico.diagnosticar.schemas import (
 
 from app.features.servicos.models import ServicoBase
 from app.features.estoque.models import PecaInsumo
+from app.shared.domain.ports.notificacao import EnviadorNotificacaoPort
+from app.features.clientes.models import Cliente
 
 
 class LancarDiagnosticoHandler:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, notificacao_service: EnviadorNotificacaoPort):
         self.db = db
         self.repository = OrdemServicoRepository(db)
+        self.notificador = notificacao_service
 
     async def executar(
         self, os_id: UUID, command: LancarDiagnosticoRequest, mecanico_id: UUID
@@ -117,5 +120,27 @@ class LancarDiagnosticoHandler:
 
         # 8. Refresh para reidratar os relacionamentos com eager join (como item.peca para AliasPath)
         await self.db.refresh(os)
+
+        # 9. DISPARO DO WHATSAPP ASSÍNCRONO (Não bloqueia o fluxo principal da transação)
+        # Busca os dados do cliente de forma relacional
+        query_cliente = select(Cliente).where(Cliente.id == os.cliente_id)
+        res_cli = await self.db.execute(query_cliente)
+        cliente = res_cli.scalar_one_or_none()
+
+        # 2. Se o cliente for encontrado, dispara o WhatsApp de forma segura
+        if cliente:
+            valor_servicos = sum(item.preco_aplicado for item in os.itens_servico)
+            valor_pecas = sum(
+                item.preco_unitario_aplicado * item.quantidade for item in os.itens_peca
+            )
+            valor_total_calculado = valor_servicos + valor_pecas
+
+            # Dispara a notificação com os dados calculados
+            await self.notificador.enviar_link_aprovacao(
+                telefone=cliente.telefone,
+                cliente_nome=cliente.nome,
+                visualizacao_hash=os.visualizacao_hash,
+                valor_total=valor_total_calculado,
+            )
 
         return OrdemServicoResponse.model_validate(os)
