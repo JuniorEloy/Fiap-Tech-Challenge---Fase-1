@@ -25,5 +25,4 @@ class RegistroEntradaResponse(BaseModel):
         description="Atualizado pelo domínio após a entrada. Se o novo saldo for >= 15, será False.",
     )
 
-    # 🌟 Padrão Pydantic v2 livre de warnings de depreciação!
     model_config = ConfigDict(from_attributes=True)

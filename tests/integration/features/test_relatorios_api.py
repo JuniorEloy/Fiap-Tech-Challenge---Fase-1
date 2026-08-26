@@ -38,7 +38,6 @@ async def test_gerente_deve_conseguir_acessar_relatorio_cliente_veiculo_com_suce
     assert "total_veiculos" in body
     assert isinstance(body["clientes"], list)
 
-    # 🌟 A validação agora atesta que veículos estão aninhados sob cada cliente!
     assert (
         "veiculos" not in body
     )  # Não deve mais existir uma chave flat "veiculos" na raiz

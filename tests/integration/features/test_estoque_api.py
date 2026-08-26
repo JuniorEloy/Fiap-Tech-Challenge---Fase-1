@@ -200,9 +200,7 @@ async def test_baixar_estoque_gatilho_politica_compra_menor_que_15(
     assert response.status_code == status.HTTP_200_OK
     body = response.json()
     assert body["saldo_restante"] == 12
-    assert (
-        body["precisa_recompra"] is True
-    )  # 👈 Política de domínio ativada com sucesso!
+    assert body["precisa_recompra"] is True
 
 
 @pytest.mark.asyncio

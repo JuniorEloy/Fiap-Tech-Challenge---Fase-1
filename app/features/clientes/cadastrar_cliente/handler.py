@@ -38,8 +38,6 @@ class CadastrarClienteHandler:
 
         # Adiciona o usuário na sessão do banco
         self.repository.db.add(novo_usuario)
-
-        # 🌟 AQUI ESTÁ A CORREÇÃO: Força o insert do usuário ocorrer primeiro no Postgres!
         await self.repository.db.flush()
 
         # 3. Criamos a entidade Cliente apontando para o id do Usuario recém-criado

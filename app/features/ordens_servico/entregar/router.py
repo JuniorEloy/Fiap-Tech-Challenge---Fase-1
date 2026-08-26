@@ -14,6 +14,14 @@ from app.features.ordens_servico.entregar.schemas import (
     EntregaOSResponse,
 )
 
+from app.shared.domain.ports.notificacao import EnviadorNotificacaoPort
+from app.shared.domain.ports.pagamento import GatewayPagamentoPort
+from app.shared.infra.dependencies import (
+    obter_notificador_whatsapp,
+    obter_gateway_pagamento,
+)
+
+
 router = APIRouter(prefix="/ordens-servico", tags=["Gestão de Ordens de Serviço"])
 
 
@@ -23,18 +31,27 @@ router = APIRouter(prefix="/ordens-servico", tags=["Gestão de Ordens de Serviç
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE]))],
 )
-async def registrar_entrega_e_pagamento(
+async def entregar_ordem_servico(
     id: UUID,
     payload: RegistrarEntregaRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
+    gateway_pagamento: Annotated[
+        GatewayPagamentoPort, Depends(obter_gateway_pagamento)
+    ],
+    notificador: Annotated[
+        EnviadorNotificacaoPort, Depends(obter_notificador_whatsapp)
+    ],
     operador_atual: Annotated[UsuarioToken, Depends(obter_usuario_atual)],
 ):
     """
-    Registra o recebimento financeiro no caixa (pagamento) e autoriza a entrega final do veículo ao cliente.
-    Transiciona a Ordem de Serviço do status 'FINALIZADA' para o status finalizador 'ENTREGUE'.
-    Acesso autorizado apenas para RECEPCIONISTA ou GERENTE.
+    Registra o faturamento de caixa e autoriza a saída física do veículo do pátio.
+    Aciona o gateway de pagamentos para cartões e envia notificação via WhatsApp.
+    Acesso autorizado para RECEPCIONISTAS ou GERENTES.
     """
-    handler = RegistrarEntregaHandler(db)
+
+    handler = RegistrarEntregaHandler(
+        db=db, gateway_pagamento=gateway_pagamento, notificador=notificador
+    )
     return await handler.executar(
         os_id=id, command=payload, operador_id=operador_atual.id
     )

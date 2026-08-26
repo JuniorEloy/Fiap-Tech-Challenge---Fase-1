@@ -1150,7 +1150,7 @@ async def test_falha_na_aprovacao_se_estoque_for_insuficiente(
             "nome": f"Amortecedor Cofap Cruze {uid}",
             "preco_custo": 150.00,
             "preco_venda": 350.00,
-            "quantidade_inicial": 3,  # 🌟 Estoque real: 3 unidades
+            "quantidade_inicial": 3,
             "limite_minimo": 1,
         },
         headers=headers_estoque,

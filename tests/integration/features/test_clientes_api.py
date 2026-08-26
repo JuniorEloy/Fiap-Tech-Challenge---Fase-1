@@ -189,7 +189,6 @@ async def test_editar_cliente_enviando_valores_nulos_deve_preservar_originais(
     cliente_id = res_cliente.json()["id"]
 
     # 2. Executa a edição omitindo as chaves não alteradas.
-    # 🌟 Isso resolve o erro 422 caso os validadores de campo do seu Schema local não aceitem None explícito!
     payload_edicao = {"nome": f"Cliente Carla Editada {uid}"}
     response = await async_client.put(
         f"/clientes/{cliente_id}", json=payload_edicao, headers=headers
@@ -199,10 +198,9 @@ async def test_editar_cliente_enviando_valores_nulos_deve_preservar_originais(
     assert response.status_code == status.HTTP_200_OK
     body = response.json()
     assert body["nome"] == f"Cliente Carla Editada {uid}"
-    assert body["email"] == f"carla.preservar.{uid}@gmail.com"  # Mantido!
-    # 🌟 Ajustado para o comportamento do seu VO que retorna dígitos limpos sem formatação de máscara!
-    assert body["telefone"] == "11955554444"  # Mantido!
-    assert body["tipo_pessoa"] == "FISICA"  # Mantido!
+    assert body["email"] == f"carla.preservar.{uid}@gmail.com"
+    assert body["telefone"] == "11955554444"
+    assert body["tipo_pessoa"] == "FISICA"
 
 
 @pytest.mark.asyncio

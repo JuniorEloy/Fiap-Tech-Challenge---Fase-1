@@ -39,7 +39,6 @@ class FinalizarOrdemServicoHandler:
 
         # 2. Valida se a OS está em andamento (manutenção ativa)
         if os.status != StatusOS.EM_EXECUCAO:
-            # 🌟 Garante compatibilidade caso o SQLAlchemy hidrate como str
             status_atual = getattr(os.status, "value", os.status)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

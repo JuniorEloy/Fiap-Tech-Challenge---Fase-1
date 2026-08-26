@@ -290,7 +290,7 @@ async def semear_banco():
                     "descricao": "Pastilha de cerâmica macia livre de ruídos",
                     "preco_custo": Decimal("80.00"),
                     "preco_venda": Decimal("160.00"),
-                    "quantidade_em_estoque": 12,  # 👈 Abaixo de 15, gatilha recompra!
+                    "quantidade_em_estoque": 12,
                     "limite_minimo": 15,
                 },
                 {
@@ -298,7 +298,7 @@ async def semear_banco():
                     "descricao": "Filtro anti-pólen para sistema de ar-condicionado",
                     "preco_custo": Decimal("20.00"),
                     "preco_venda": Decimal("45.00"),
-                    "quantidade_em_estoque": 8,  # 👈 Abaixo de 15, gatilha recompra!
+                    "quantidade_em_estoque": 8,
                     "limite_minimo": 15,
                 },
             ]

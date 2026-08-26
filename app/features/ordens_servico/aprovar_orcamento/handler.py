@@ -29,7 +29,7 @@ class ResponderOrcamentoHandler:
         query_estoque = (
             select(PecaInsumo)
             .where(PecaInsumo.id.in_(peca_ids))
-            .with_for_update()  # 🌟 LOCK PESSIMISTA ATIVO!
+            .with_for_update()  # LOCK PESSIMISTA ATIVO!
         )
         res_estoque = await self.db.execute(query_estoque)
         pecas_db = {p.id: p for p in res_estoque.scalars().all()}

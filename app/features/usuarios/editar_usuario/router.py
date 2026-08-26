@@ -20,9 +20,7 @@ router = APIRouter(prefix="/usuarios", tags=["Gestão de Usuários"])
     "/{id}",
     response_model=UsuarioEditadoResponse,
     status_code=status.HTTP_200_OK,
-    dependencies=[
-        Depends(requer_roles([Role.GERENTE]))
-    ],  # 👈 Exclusividade total do Gerente!
+    dependencies=[Depends(requer_roles([Role.GERENTE]))],
 )
 async def editar_operador(
     id: UUID,

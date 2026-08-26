@@ -23,9 +23,7 @@ router = APIRouter(prefix="/ordens-servico", tags=["Gestão de Ordens de Serviç
     "/{id}/resposta",
     response_model=RespostaOrcamentoResponse,
     status_code=status.HTTP_200_OK,
-    dependencies=[
-        Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE]))
-    ],  # 👈 Operador registrando a resposta do cliente
+    dependencies=[Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE]))],
 )
 async def registrar_resposta_cliente_operador(
     id: UUID,

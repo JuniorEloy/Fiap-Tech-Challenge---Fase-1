@@ -20,13 +20,10 @@ router = APIRouter(prefix="/servicos", tags=["Gestão de Serviços"])
     "",
     response_model=ServicoResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[
-        Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE]))
-    ],  # 👈 Restrito por RBAC
+    dependencies=[Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE]))],
 )
 async def cadastrar_servico(
     payload: CadastrarServicoRequest,
-    # 🌟 Injeção de dependência moderna utilizando Annotated (PEP 593 e SonarQube S8410)
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     """

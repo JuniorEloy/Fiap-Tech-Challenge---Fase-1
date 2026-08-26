@@ -20,9 +20,7 @@ router = APIRouter(prefix="/estoque", tags=["Gestão de Estoque"])
     "",
     response_model=PecaResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[
-        Depends(requer_roles([Role.ESTOQUISTA, Role.GERENTE]))
-    ],  # 👈 Restringe Mecânicos e Recepcionistas!
+    dependencies=[Depends(requer_roles([Role.ESTOQUISTA, Role.GERENTE]))],
 )
 async def cadastrar_peca_insumo(
     payload: CadastrarPecaRequest, db: Annotated[AsyncSession, Depends(get_db)]

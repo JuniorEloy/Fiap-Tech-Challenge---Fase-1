@@ -21,9 +21,7 @@ router = APIRouter(prefix="/veiculos", tags=["Veículos"])
     "",
     response_model=VeiculoResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[
-        Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE]))
-    ],  # 👈 Bloqueia Mecânicos/Clientes/Estoquistas!
+    dependencies=[Depends(requer_roles([Role.RECEPCIONISTA, Role.GERENTE]))],
 )
 async def cadastrar_veiculo(
     payload: CadastrarVeiculoRequest, db: Annotated[AsyncSession, Depends(get_db)]

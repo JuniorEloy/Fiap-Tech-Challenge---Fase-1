@@ -325,9 +325,6 @@ async def test_login_excedendo_rate_limit_deve_bloquear(
     assert status.HTTP_429_TOO_MANY_REQUESTS in responses
 
 
-# 🌟 CORREÇÃO DO RATE LIMITER:
-# Em vez de desativar globalmente, desativamos dinamicamente para todos os testes,
-# EXCETO para aqueles que validam explicitamente o rate limit (que possuem 'rate_limit' ou 'ratelimit' no nome).
 @pytest.fixture(autouse=True)
 def gerenciar_rate_limiter_nos_testes(request):
     try:
