@@ -462,16 +462,18 @@ async def test_gerente_deve_excluir_cliente_sem_vinculos_com_sucesso(
         "email": f"excluir.cliente.{uuid7().hex[:6]}@mecanicar.com",
         "telefone": "11966665555",
         "cpf_cnpj": cpf_valido,
-        "tipo_pessoa": "FISICA"
+        "tipo_pessoa": "FISICA",
     }
-    res_cli = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    res_cli = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
     assert res_cli.status_code == status.HTTP_201_CREATED
     cliente_id = res_cli.json()["id"]
 
     # 2. Exclui o cliente cadastrado (Retorna 200 OK com Schema)
     res_del = await async_client.delete(f"/clientes/{cliente_id}", headers=headers)
     assert res_del.status_code == status.HTTP_200_OK
-    
+
     body = res_del.json()
     assert body["cliente_id"] == cliente_id
     assert body["nome"] == "Cliente Sem Vinculos"
@@ -480,6 +482,7 @@ async def test_gerente_deve_excluir_cliente_sem_vinculos_com_sucesso(
     # 3. Garante que nao e possivel encontrar o cliente mais
     res_get = await async_client.get(f"/clientes/{cliente_id}", headers=headers)
     assert res_get.status_code == status.HTTP_404_NOT_FOUND
+
 
 @pytest.mark.asyncio
 async def test_deve_bloquear_exclusao_de_cliente_com_veiculo_vinculado(
@@ -494,9 +497,11 @@ async def test_deve_bloquear_exclusao_de_cliente_com_veiculo_vinculado(
         "email": f"cliente.proprietario.{uuid7().hex[:6]}@mecanicar.com",
         "telefone": "11955554444",
         "cpf_cnpj": cpf_valido,
-        "tipo_pessoa": "FISICA"
+        "tipo_pessoa": "FISICA",
     }
-    res_cli = await async_client.post("/clientes", json=payload_cliente, headers=headers)
+    res_cli = await async_client.post(
+        "/clientes", json=payload_cliente, headers=headers
+    )
     assert res_cli.status_code == status.HTTP_201_CREATED
     cliente_id = res_cli.json()["id"]
 
@@ -506,7 +511,7 @@ async def test_deve_bloquear_exclusao_de_cliente_com_veiculo_vinculado(
         "marca": "Chevrolet",
         "modelo": "Cruze",
         "ano": 2020,
-        "cliente_id": cliente_id
+        "cliente_id": cliente_id,
     }
     await async_client.post("/veiculos", json=payload_veiculo, headers=headers)
 
@@ -514,6 +519,7 @@ async def test_deve_bloquear_exclusao_de_cliente_com_veiculo_vinculado(
     res_del = await async_client.delete(f"/clientes/{cliente_id}", headers=headers)
     assert res_del.status_code == status.HTTP_400_BAD_REQUEST
     assert "possui veiculos ou ordens de servico vinculadas" in res_del.json()["detail"]
+
 
 @pytest.mark.asyncio
 async def test_mecanico_nao_deve_excluir_cliente(
@@ -524,6 +530,7 @@ async def test_mecanico_nao_deve_excluir_cliente(
 
     res_del = await async_client.delete(f"/clientes/{cliente_id}", headers=headers)
     assert res_del.status_code == status.HTTP_403_FORBIDDEN
+
 
 @pytest.mark.asyncio
 async def test_excluir_cliente_inexistente_deve_retornar_404(

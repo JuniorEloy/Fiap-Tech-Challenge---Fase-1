@@ -750,11 +750,16 @@ async def test_gerente_deve_excluir_veiculo_sem_vinculos_com_sucesso(
     assert res_vei.status_code == status.HTTP_201_CREATED
     veiculo_id = res_vei.json()["id"]
 
-    # 3. Executa a exclusao do veiculo cadastrado
+    # 3. Executa a exclusao do veiculo cadastrado (Retorna 200 OK com Schema)
     res_del = await async_client.delete(f"/veiculos/{veiculo_id}", headers=headers)
-    assert res_del.status_code == status.HTTP_204_NO_CONTENT
+    assert res_del.status_code == status.HTTP_200_OK
 
-    # 4. Garante que nao e possivel encontrar o veiculo mais (consultando pela placa, rota que realmente existe)
+    body = res_del.json()
+    assert body["veiculo_id"] == veiculo_id
+    assert body["placa"] == placa_teste.upper()
+    assert "removido com sucesso" in body["mensagem"]
+
+    # 4. Garante que nao e possivel encontrar o veiculo mais pela rota de placa
     res_get = await async_client.get(f"/veiculos/placa/{placa_teste}", headers=headers)
     assert res_get.status_code == status.HTTP_404_NOT_FOUND
 
@@ -798,8 +803,8 @@ async def test_deve_bloquear_exclusao_de_veiculo_com_ordem_servico_vinculada(
     payload_os = {
         "cliente_id": cliente_id,
         "veiculo_id": veiculo_id,
-        "servicos": [],
-        "pecas": [],
+        "servicos_solicitados": [],
+        "pecas_solicitadas": [],
     }
     res_os = await async_client.post(
         "/ordens-servico", json=payload_os, headers=headers
