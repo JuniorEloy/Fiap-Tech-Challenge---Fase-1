@@ -27,8 +27,10 @@ share/python-wheels/
 MANIFEST
 .env.prod
 .env.test
-sonar*
-coverage*
+sonar-project.properties
+.coverage*
+coverage.xml
+report.xml
 .scannerwork
 # PyInstaller
 #   Usually these files are written by a python script from a template
@@ -43,7 +45,6 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Unit test / coverage reports
-htmlcov/
 .tox/
 .nox/
 .coverage
@@ -224,3 +225,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+!*coverage_html*

@@ -1,4 +1,4 @@
-# Mecanicar - Sistema Integrado de Gestao Automotiva (Fase 1)
+# Mecanicar - Sistema Integrado de Gestao Automotiva
 
 O Mecanicar e um ecossistema digital corporativo desenvolvido sob medida para uma oficina mecanica de medio porte situada no interior paulista. O projeto engloba desde a descoberta tatica de dominio ate a implementacao de um ecossistema robusto, seguro, testado e de facil inicializacao conteinerizada.
 
@@ -213,7 +213,7 @@ Escolha uma das instrucoes abaixo de acordo com a sua necessidade de analise:
 - **Gerar os relatorios XML de testes e cobertura para integracao com SonarQube / CI:**
   ```bash
   APP_ENV=test uv run pytest --junitxml=report.xml
-  APP_ENV=test uv run coverage xml -I
+  APP_ENV=test uv run coverage xml
   ```
 
 ---
