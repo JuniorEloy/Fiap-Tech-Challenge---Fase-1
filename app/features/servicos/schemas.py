@@ -3,8 +3,10 @@ from uuid import UUID
 from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 
+
 class ServicoResponse(BaseModel):
     """Schema de Saída: Confirmação rica do serviço inserido ou listado no catálogo."""
+
     id: UUID
     nome: str
     descricao: Optional[str] = None

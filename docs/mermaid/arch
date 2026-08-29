@@ -1,0 +1,64 @@
+flowchart TB
+project_root["Fiap Tech Challenge Fase 1"]
+subgraph sg_presentation["Presentation"]
+direction LR
+app_features_clientes["Clientes"]
+app["App"]
+end
+subgraph sg_application["Application"]
+direction TB
+root["Root"]
+app_scripts["Scripts"]
+app_shared_security["Security"]
+alembic["Alembic"]
+app_features_servicos["Servicos"]
+app_features_usuarios["Usuarios"]
+app_features_estoque["Estoque"]
+app_features_veiculos["Veiculos"]
+app_shared_infra_db["Db"]
+app_shared_infra["Infra"]
+app_shared_utils["Utils"]
+docker["Docker"]
+app_shared["Shared"]
+app_shared_models["Models"]
+end
+subgraph sg_datastores [Data stores]
+direction LR
+store_postgres[(Postgres)]
+end
+project_root -.-> app_features_clientes
+project_root -.-> app
+root -->|imports| app_shared_security
+root --> app_features_usuarios
+alembic -->|uses| app
+alembic --> app_shared_models
+alembic -->|uses| app_features_clientes
+alembic --> app_features_usuarios
+alembic --> app_features_veiculos
+alembic --> app_features_estoque
+alembic --> app_features_servicos
+app -->|HTTP| app_shared
+app --> app_features_clientes
+app -->|HTTP| app_features_usuarios
+app -->|HTTP| app_features_veiculos
+app -->|HTTP| app_features_servicos
+app -->|HTTP| app_features_estoque
+app_features_clientes -->|HTTP| app_shared_models
+app_features_servicos --> app_shared_models
+app_features_usuarios --> app_shared_models
+app_features_usuarios --> app_shared_security
+app_features_usuarios --> app_shared_utils
+app_shared_infra_db -->|uses| app
+root -->|uses| app
+root --> app_shared_infra_db
+root -->|uses| app_scripts
+root -->|uses| alembic
+root -->|uses| app_features_servicos
+root -->|uses| app_features_estoque
+root -->|uses| app_features_veiculos
+root -->|uses| app_shared_infra
+root -->|uses| app_shared_utils
+root -->|uses| docker
+root -->|reads| app_shared
+root -->|uses| app_shared_models
+root ~~~ store_postgres

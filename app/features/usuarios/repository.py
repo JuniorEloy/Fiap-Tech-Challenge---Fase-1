@@ -31,4 +31,4 @@ class UsuarioRepository:
         """
         usuario.ativo = False
         self.db.add(usuario)
-        await self.db.flush() 
+        await self.db.flush()

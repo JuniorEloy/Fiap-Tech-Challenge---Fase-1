@@ -11,8 +11,8 @@ from app.features.estoque.router import estoque_router
 from app.features.ordens_servico.router import os_router
 
 app = FastAPI(
-    title="Automotive Service Integrated System",
-    description="MVP de Gestão de Oficina Mecânica - Tech Challenge FIAP",
+    title="Mecanicar Service Integrated System",
+    description="API - Gestão de Oficina Mecânica",
     version="1.0.0",
 )
 

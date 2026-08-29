@@ -216,9 +216,21 @@ Escolha uma das instrucoes abaixo de acordo com a sua necessidade de analise:
   APP_ENV=test uv run coverage xml
   ```
 
+### Como Rodar a API
+
+- **Executar a aplicação:**
+  ```bash
+  APP_ENV=test uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+  ```
+
+### Acessando a aplicação
+
+API: http://localhost:8000
+Docs: http://localhost:8000/docs
+
 ---
 
-## 10. Credenciais de Testes e Massa de Dados (Seed v4)
+## 11. Credenciais de Testes e Massa de Dados (Seed v4)
 
 Utilize os usuarios cadastrados pelo seeder automatico para simular o acesso baseado em papeis (RBAC):
 

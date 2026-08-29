@@ -53,6 +53,7 @@ from app.features.ordens_servico.models import (
 MSG_TROCA_DE_OLEO_E_FILTRO = "Troca de Óleo e Filtros"
 MSG_ALINHAMENTO_BALANCEAMENTO_3D = "Alinhamento e Balanceamento 3D"
 
+
 async def semear_banco():
     print(
         "🚀 [v3] Iniciando processo de seeding com CPFs, CNPJ e fluxos completos de OSs..."

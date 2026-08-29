@@ -1,9 +1,7 @@
 from fastapi import HTTPException, status
 from app.features.servicos.models import ServicoBase
 from app.features.servicos.repository import ServicosRepository
-from app.features.servicos.cadastrar_servico.schemas import (
-    CadastrarServicoRequest
-)
+from app.features.servicos.cadastrar_servico.schemas import CadastrarServicoRequest
 from app.features.servicos.schemas import ServicoResponse
 
 
