@@ -35,6 +35,8 @@ coverage*
 #   before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+*coverage*
+*.DS_Store*
 
 # Installer logs
 pip-log.txt
