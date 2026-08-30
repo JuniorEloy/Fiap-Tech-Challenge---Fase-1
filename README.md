@@ -143,6 +143,8 @@ O código-fonte do Mecanicar é verificado de forma contínua para alcançar con
 
 ---
 
+> [!IMPORTANT] Antes de mais nada há o arquivo .env.prod.example, caso deseje configure ele de forma segura, senão mantenha as variáveis padrões, mas em ambos os casos, é necessário renomar o arquivo para .env.prod.
+
 ## 8. Guia de Inicialização Rápida (Quick Start)
 
 Coloque toda a aplicação, o banco de dados e a massa de testes de produção em execução local em um único comando.
@@ -166,6 +168,8 @@ docker compose up --build
 ---
 
 ## 9. Guia de Inicialização do Ambiente de Testes (Test Quick Start)
+
+> [!IMPORTANT] Antes de mais nada há o arquivo .env.test.example, caso deseje configure ele de forma segura, senão mantenha as variáveis padrões, mas em ambos os casos, é necessário renomar o arquivo para .env.test.
 
 Configure e execute toda a suíte de testes locais (unitários e integração) acompanhados dos relatórios de cobertura de código dentro de um ambiente de testes totalmente isolado.
 
